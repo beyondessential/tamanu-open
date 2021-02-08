@@ -1,0 +1,30 @@
+app:
+  build: .
+  encrypted_env_file: codeship.env.encrypted
+  volumes:
+    - ./.tmp:/tamanu
+    - ./.ssh:/root/.ssh
+  environment:
+    ELECTRON_CONFIG_CACHE: "$HOME/cache/electron"
+    CONFIG_SYNC_DB_NAME: postgres
+    CONFIG_SYNC_DB_HOST: postgres
+    CONFIG_SYNC_DB_USERNAME: postgres
+    CONFIG_SYNC_DB_PASSWORD: postgres
+
+  depends_on:
+    - postgres
+
+awsdeployment:
+  build:
+    dockerfile: Dockerfile.deploy
+  encrypted_env_file: codeship.env.encrypted
+  volumes:
+    - ./.tmp:/tamanu
+    - ./.ssh:/root/.ssh
+
+postgres:
+  image: healthcheck/postgres
+  environment:
+    - POSTGRES_DB=postgres
+    - POSTGRES_USER=postgres
+    - POSTGRES_PASSWORD=postgres

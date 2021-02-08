@@ -1,0 +1,63 @@
+{
+  "name": "tamanu",
+  "version": "0.0.1",
+  "description": "This repo contains all the packages for Tamanu",
+  "main": "index.js",
+  "homepage": "https://github.com/beyondessential/tamanu.git#readme",
+  "repository": "git@github.com:beyondessential/tamanu.git",
+  "author": "Beyond Essential Systems Pty. Ltd.",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "build-shared": "yarn workspace shared-src run build",
+    "test": "yarn run build-shared && yarn workspace lan run test && yarn workspace sync-server run test && yarn workspace meta-server run test",
+    "lint-all": "eslint packages/desktop/app packages/server/app packages/lan/app packages/shared/services packages/shared/constants packages/shared/utils",
+    "upgrade-lint-rules": "yarn workspaces run upgrade @beyondessential/eslint-config-beyondessential --latest",
+    "desktop-start-dev": "yarn workspace desktop run start-dev",
+    "watch-shared-and": "node scripts/watch-shared-and.js",
+    "lan-test": "yarn run build-shared && yarn workspace lan run test",
+    "lan-start-dev": "yarn run watch-shared-and lan start-dev",
+    "lan-test-watch": "yarn run watch-shared-and lan test-watch",
+    "sync-test": "yarn run build-shared && yarn workspace sync-server run test",
+    "sync-start-dev": "yarn run watch-shared-and sync-server start-dev",
+    "sync-test-watch": "yarn run watch-shared-and sync-server test-watch",
+    "sync-start": "yarn run sync-start-dev",
+    "meta-test": "yarn run build-shared && yarn workspace meta-server run test",
+    "meta-start-dev": "yarn run watch-shared-and meta-server start-dev",
+    "meta-test-watch": "yarn run watch-shared-and meta-server test-watch",
+    "meta-start": "yarn run meta-start-dev"
+  },
+  "engines": {
+    "node": "^12"
+  },
+  "private": true,
+  "workspaces": {
+    "packages": [
+      "packages/scripts",
+      "packages/desktop",
+      "packages/lan",
+      "packages/server",
+      "packages/sync-server",
+      "packages/meta-server",
+      "packages/shared",
+      "packages/shared-src"
+    ],
+    "nohoist": [
+      "**/webpack",
+      "**/webpack/**",
+      "**/fbjs-scripts",
+      "**/fbjs-scripts/**",
+      "**/config",
+      "**/config/**"
+    ]
+  },
+  "devDependencies": {
+    "eslint-config-prettier": "^4.3.0",
+    "eslint-plugin-prettier": "^3.1.0",
+    "prettier": "^1.17.1"
+  },
+  "dependencies": {
+    "babel-eslint": "^10.0.1",
+    "concurrently": "^5.2.0",
+    "pm2": "^4.5.0"
+  }
+}
