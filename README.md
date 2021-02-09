@@ -16,8 +16,8 @@ Additionally:
 
 ## Downloads	
 Please note these are **demo** downloads so are available for evaluation purposes and are still works in progress:	
-- [desktop](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210208-tamanu-desktop-demo-dev-f2af34f4.zip)	
-- [lan](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210208-tamanu-lan-demo-dev-f2af34f4.zip)	
+- [desktop](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210209-tamanu-desktop-demo-dev-59150e5d.zip)	
+- [lan](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210209-tamanu-lan-demo-dev-59150e5d.zip)	
 
 Please note: LAN server and desktop app doesn't come with our sync server bundled. Instructions on how to deploy our sync server are contained elsewhere in the repository.
 
