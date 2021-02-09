@@ -7,12 +7,19 @@ The monorepo has four main components:
 
 * [desktop](packages/desktop): the main Electron app
 * [lan](packages/lan): the local server, which the app communicates with
-* [sync-server](packages/sync-server): the synchronisation server, which lan server and mobile client instances communicate with to synchronise data
+* [sync-server](packages/sync-server): the synchronisation server, which lan server and mobile client instances communicate with to synchronise data (still under development and not included in open source release)
 * [shared-src](packages/shared-src): shared code among Tamanu components
 
 Additionally:
 
 * [shared](packages/shared): the build output of the `shared-src` module (ignored by version control)
+
+## Downloads	
+Please note these are **demo** downloads so are available for evaluation purposes and are still works in progress:	
+- [desktop](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210208-tamanu-desktop-demo-dev-f2af34f4.zip)	
+- [lan](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210208-tamanu-lan-demo-dev-f2af34f4.zip)	
+
+Please note: LAN server and desktop app doesn't come with our sync server bundled. Instructions on how to deploy our sync server are contained elsewhere in the repository.
 
 ## Install
 
