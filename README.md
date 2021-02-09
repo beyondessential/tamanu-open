@@ -7,7 +7,7 @@ The monorepo has four main components:
 
 * [desktop](packages/desktop): the main Electron app
 * [lan](packages/lan): the local server, which the app communicates with
-* [sync-server](packages/sync-server): the synchronisation server, which lan server and mobile client instances communicate with to synchronise data (still under development and not included in open source release)
+* [sync-server](packages/sync-server): the synchronisation server, which lan server and mobile client instances communicate with to synchronise data (not included in open source release pending security review)
 * [shared-src](packages/shared-src): shared code among Tamanu components
 
 Additionally:
