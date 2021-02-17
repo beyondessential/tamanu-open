@@ -18,6 +18,10 @@ function makeScreen(screen, componentData) {
   return screen.dataElements.map(((component, i) => {
     const {
       visibilityCriteria = '',
+      validationCriteria = '',
+      detail = '',
+      config = '',
+      calculation = '',
       ...elementData
     } = component;
 
@@ -34,6 +38,10 @@ function makeScreen(screen, componentData) {
       options: '',
       componentIndex: i,
       visibilityCriteria,
+      validationCriteria,
+      detail,
+      config,
+      calculation,
       ...componentData,
     });
 
@@ -48,6 +56,7 @@ export async function importSurvey(taskDefinition) {
     programName,
     surveyCode,
     surveyName,
+    dryRun,
   } = taskDefinition;
   log.info(`Reading surveys from ${file}...`);
 
@@ -73,6 +82,16 @@ export async function importSurvey(taskDefinition) {
 
   const components = screenElements.filter(x => x.recordType === 'surveyScreenComponent');
   const pdes = screenElements.filter(x => x.recordType === 'programDataElement');
+
+  if (dryRun) {
+    [
+      programElement,
+      surveyElement,
+      pdes,
+      components,
+    ].map(x => console.log(x));
+    return;
+  }
 
   await sendSyncRequest('program', [programElement]);
   await sendSyncRequest('survey', [surveyElement]);

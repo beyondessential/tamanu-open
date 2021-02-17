@@ -7,7 +7,7 @@ The monorepo has four main components:
 
 * [desktop](packages/desktop): the main Electron app
 * [lan](packages/lan): the local server, which the app communicates with
-* [sync-server](packages/sync-server): the synchronisation server, which lan server and mobile client instances communicate with to synchronise data (not included in open source release pending security review)
+* [sync-server](packages/sync-server): the synchronisation server, which lan server and mobile client instances communicate with to synchronise data
 * [shared-src](packages/shared-src): shared code among Tamanu components
 
 Additionally:
@@ -18,13 +18,6 @@ The latest version for each Tamanu service (Local Area Network Server, Desktop C
 * LAN server: https://meta.tamanu.io/version/lan
 * Desktop client: https://meta.tamanu.io/version/desktop
 * Mobile client: https://meta.tamanu.io/version/mobile
-
-## Downloads	
-Please note these are **demo** downloads so are available for evaluation purposes and are still works in progress:	
-- [desktop](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210209-tamanu-desktop-demo-dev-59150e5d.zip)	
-- [lan](https://tamanu-builds.s3-ap-southeast-2.amazonaws.com/20210209-tamanu-lan-demo-dev-59150e5d.zip)	
-
-Please note: LAN server and desktop app doesn't come with our sync server bundled. Instructions on how to deploy our sync server are contained elsewhere in the repository.
 
 ## Install
 
