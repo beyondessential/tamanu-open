@@ -1,0 +1,76 @@
+export const MODEL_DEPENDENCY_ORDER = [
+  'ReferenceData',
+  'Asset',
+  'Facility',
+  'Department',
+  'Location',
+  'Role',
+  'Permission',
+
+  'User',
+  'UserFacility',
+
+  'Patient',
+  'Encounter',
+
+  'PatientAllergy',
+  'PatientCarePlan',
+  'PatientCondition',
+  'PatientFamilyHistory',
+  'PatientIssue',
+  'PatientAdditionalData',
+
+  // Temporarily remove death data models from sync as sync cannot handle the foreign key cycle
+  // 'DeathCause',
+  // 'PatientDeathData',
+
+  'EncounterDiagnosis',
+  'EncounterMedication',
+  'Procedure',
+  'Referral',
+  'Vitals',
+  'Triage',
+
+  'CertifiableVaccine',
+  'ScheduledVaccine',
+  'AdministeredVaccine',
+
+  'Program',
+  'ProgramDataElement',
+  'Survey',
+  'SurveyScreenComponent',
+
+  'SurveyResponse',
+  'SurveyResponseAnswer',
+
+  'LabTestType',
+  'LabTest',
+  'LabRequest',
+  'ImagingRequest',
+
+  'Note',
+
+  'ReportRequest',
+  'PatientCommunication',
+  'CertificateNotification',
+
+  'Invoice',
+  'InvoiceLineType',
+  'InvoiceLineItem',
+  'InvoicePriceChangeType',
+  'InvoicePriceChangeItem',
+
+  // 'LabRequestLog',
+  'DocumentMetadata',
+];
+
+const lowercaseModelOrder = MODEL_DEPENDENCY_ORDER.map(x => x.toLowerCase());
+
+export const compareModelPriority = (modelNameA, modelNameB) => {
+  const priorityA = lowercaseModelOrder.indexOf(modelNameA.toLowerCase());
+  const priorityB = lowercaseModelOrder.indexOf(modelNameB.toLowerCase());
+  const delta = priorityA - priorityB;
+  if (delta) return delta;
+
+  return modelNameA.localeCompare(modelNameB);
+};

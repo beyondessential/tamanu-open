@@ -1,0 +1,75 @@
+# Importers for data definition documents
+
+# Just edit the file paths inside each request to point to a file on
+# your local FS - unfortunately REST client doesn't support making variable
+# paths to attachments yet.
+
+# Note that these are designed to be sent to a LAN server, acting as a
+# go-between for a sync server, rather than directly to the sync server.
+
+@lanserver=http://localhost:4000
+@token=fake-token
+
+# a boundary can be any string that doesn't appear in the body of the upload data
+@boundary=TamanuMultipartBoundary08078136519445114555
+
+##-------
+### Obtain a token
+POST {{lanserver}}/v1/login
+Content-Type: application/json
+
+{
+    "email": "admin@tamanu.io",
+    "password": "password",
+}
+
+
+##--------------------------------------------
+### Import a survey definition
+POST {{lanserver}}/v1/admin/importProgram
+Content-Type: multipart/form-data; boundary={{boundary}}
+Authorization: Bearer {{token}}
+
+--{{boundary}}
+Content-Type: application/json
+Content-Disposition: form-data; name="jsonData"
+
+{
+  "whitelist": [
+
+  ],
+  "showRecords": false,
+  "dryRun": true
+}
+
+--{{boundary}}
+Content-Disposition: form-data; name="file"; filename="import.xlsx"
+Content-Type: application/vnd.ms-excel
+
+< C:\path\to\my\surveysDefinition.xlsx
+--{{boundary}}--
+
+##--------------------------------------------
+### Import a data definition document
+POST {{lanserver}}/v1/admin/importData
+Content-Type: multipart/form-data; boundary={{boundary}}
+Authorization: Bearer {{token}}
+
+--{{boundary}}
+Content-Disposition: form-data; name="jsonData"
+Content-Type: application/json
+
+{
+  "dryRun": true,
+  "allowErrors": false,
+  "whitelist": [
+    "labTestMethods"
+  ]
+}
+
+--{{boundary}}
+Content-Disposition: form-data; name="file"; filename="import.xlsx"
+Content-Type: application/vnd.ms-excel
+
+< C:\path\to\my\dataDefinition.xlsx
+--{{boundary}}--

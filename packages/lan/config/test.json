@@ -1,0 +1,24 @@
+{
+  "db": {
+    "name": "tamanu-lan-test",
+    "sqlitePath": null,
+    "migrateOnStartup": true
+  },
+  "log": {
+    "consoleLevel": null
+  },
+  "survey": {
+    "defaultCodes": {
+      "department": "Emergency",
+      "location": "Bed 1"
+    }
+  },
+  "sync": {
+    "syncAllLabRequests": true,
+    "backoff": {
+      "maxAttempts": 1,
+      "multiplierMs": 0,
+      "maxWaitMs": 0
+    }
+  }
+}

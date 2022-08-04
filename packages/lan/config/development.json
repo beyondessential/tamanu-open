@@ -1,0 +1,15 @@
+{
+  "admin": {
+    "allowAdminRoutes": true
+  },
+  "log": {
+    "console": "debug"
+  },
+  "discovery": {
+    "protocol": "http"
+  },
+  "db": {
+    "name": "develop",
+    "sqlitePath": "data/tamanu-dev.db"
+  }
+}
