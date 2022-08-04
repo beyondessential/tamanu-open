@@ -4,31 +4,22 @@
 
 [ ![Codeship Status for beyondessential/tamanu](https://app.codeship.com/projects/9355b080-d34d-0136-45ef-2e8db6e7ba42/status?branch=codeship)](https://app.codeship.com/projects/316346)
 
-| Package | Description |
-| ------- | ----------- |
-| [sync-server](packages/sync-server)* | The synchronisation server, which lan server and mobile client instances communicate with to synchronise data |
-| [lan](packages/lan) | The local server, which the app communicates with |
-| [meta-server](packages/meta-server) | The metadata server, which serves information about app versions and known sync-server installations |
-| [desktop](packages/desktop) | The main Electron app |
-| [mobile](https://github.com/beyondessential/tamanu-mobile/) | The mobile app (in [a separate repository](https://github.com/beyondessential/tamanu)) |
+| Package | Runbook | Description |
+| ------- | ------- | ----------- |
+| [sync-server](packages/sync-server) | [sync-server runbook](https://beyond-essential.slab.com/posts/tamanu-sync-server-runbook-et0trny5) | The synchronisation server, which lan server and mobile client instances communicate with to synchronise data |
+| [lan](packages/lan) | [lan runbook](https://beyond-essential.slab.com/posts/todo-tamanu-lan-runbook-ezljl0qk) | The local server, which the app communicates with |
+| [meta-server](packages/meta-server) | [meta-server runbook](https://beyond-essential.slab.com/posts/todo-tamanu-meta-server-runbook-0zbgw7m7) | The metadata server, which serves information about app versions and known sync-server installations |
+| [desktop](packages/desktop) | [desktop runbook](https://beyond-essential.slab.com/posts/todo-tamanu-desktop-runbook-i2bmy57c) | The main Electron app |
+| [mobile](packages/mobile) | [mobile runbook](https://beyond-essential.slab.com/posts/todo-tamanu-mobile-runbook-8vj8qceu) | The mobile app  |
 | [shared-src](packages/shared-src) | N/A | Shared code among Tamanu components |
 | [shared](packages/shared) | N/A | The build output of the `shared-src` module (ignored by version control) |
-
-
-<small>*&nbsp;not included in open source release pending security review </small>
+| [csca](packages/csca) | [csca runbook](https://beyond-essential.slab.com/posts/csca-runbook-be1td5ml), [signer runbook](https://beyond-essential.slab.com/posts/signer-runbook-hcws6er3) | A tool to create and manage a CSCA / ICAO eMRTD PKI |
 
 The latest version for each Tamanu service (Local Area Network Server, Desktop Client & Mobile Client) can be retrieved with a HTTP GET request via their respective public API routes:
 
 - LAN server: https://meta.tamanu.io/version/lan
 - Desktop client: https://meta.tamanu.io/version/desktop
 - Mobile client: https://meta.tamanu.io/version/mobile
-
-## Downloads	
-Please note these are **demo** downloads so are available for evaluation purposes and are still works in progress:	
-- [desktop](https://tamanu-builds.s3.ap-southeast-2.amazonaws.com/20210808-tamanu-desktop-master-b3e45b3e.zip)	
-- [lan](https://tamanu-builds.s3.ap-southeast-2.amazonaws.com/20210808-tamanu-lan-master-b3e45b3e.zip)	
-
-Please note: LAN server and desktop app doesn't come with our sync server bundled. Instructions on how to deploy our sync server are contained elsewhere in the repository.
 
 ## Install
 
@@ -38,7 +29,7 @@ First, clone the repo via git:
 $ git clone git@github.com:beyondessential/tamanu.git
 ```
 
-And then install dependencies with yarn.
+Install dependencies with yarn:
 
 ```bash
 $ cd tamanu
@@ -47,6 +38,17 @@ $ yarn config set workspaces-experimental true
 $ yarn config set workspaces-nohoist-experimental true
 $ yarn
 ```
+
+Install docker, then use it to build and run the system:
+
+```bash
+$ yarn build && docker compose up
+```
+```bash
+$ yarn desktop-start-dev
+```
+
+You can also run `yarn sync-start-dev`, `yarn lan-start-dev`, and `yarn meta-start-dev` to run individual processes without docker. You'll need to install postgres and configure databases for lan and sync.
 
 ## Configure
 
@@ -125,6 +127,7 @@ brew install postgres
 brew services start postgres
 createdb tamanu-sync
 yarn install
+yarn workspace sync-server setup-dev
 yarn sync-start-dev
 ```
 
@@ -134,8 +137,20 @@ Install the [PostgreSQL server](https://www.postgresql.org/download/windows/). O
 
 ```bash
 yarn install
+yarn workspace sync-server setup-dev
 yarn sync-start-dev
 ```
+
+#### Linux
+
+Install PostgreSQL from your package manager, and create a new database `tamanu-sync`, then run:
+
+```bash
+yarn install
+yarn workspace sync-server setup-dev
+yarn sync-start-dev
+```
+
 </details>
 
 ## Integrations
@@ -262,3 +277,46 @@ the API url and login credentials as well (see config/default.json for how this 
 - if your service imports dependencies it should list them as `dependencies` (not `devDependencies`) in its own `package.json`; it can find unlisted dependencies in the monorepo's root `node_modules` folder during local development, but won't be able to import them once deployed
 - you can ssh into your instances by setting up the eb cli and then running `eb ssh`; this is useful for setting up a database, or for in-depth debugging
 </details>
+
+## Infrastructure
+
+### Ansible
+
+```shell
+# Set up a lan server
+ansible-playbook -i infra/ansible/hosts infra/ansible/lan.yml
+```
+
+### Terraform
+
+Terraform can be used to create a Windows Server on AWS EC2 for LAN server deployment.
+
+#### Prerequisites
+
+- Install terraform on your local machine <https://www.terraform.io/downloads.html>
+- Set up AWS authentication. This can be done with environment variables (by setting `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`) or with a credential file. See <https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-configure.html> for more information.
+
+#### Create / manage a Windows server
+
+- Create a new folder path `terraform/deploy/lan/<instance-name>` and file `main.tf`. See `terraform/deploy/lan/example/main.tf` for an example file to copy.
+- Update the `key` attribute for s3 backend to point to the new instance name.
+- Update the `instance_name` attribute of the module `lan` to use the new instance name.
+
+- Run terraform from within that folder
+
+    ```shell
+    terraform init
+    terraform plan
+    terraform apply
+    ```
+
+- Once the instance is created, you can [log into the instance using SSM](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-sessions-start.html), either via the Console or the CLI.
+
+- If the instance needs to be re-created, do
+
+    ```shell
+    terraform destroy
+    terraform apply
+    ```
+
+Terraform state is stored on S3 on the [`tamanu-terraform` bucket](https://s3.console.aws.amazon.com/s3/buckets/tamanu-terraform?region=ap-southeast-2&tab=objects).
