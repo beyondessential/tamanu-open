@@ -1,0 +1,57 @@
+# OS X
+.DS_Store*
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.directory
+*~
+
+# npm
+node_modules
+package-lock.json
+*.log
+*.gz
+
+# Build targets
+release
+dev
+deploy
+build
+
+# Test artefacts
+test.*.hl7.json
+benchmarks/graphs
+coverage
+lint-summary.json
+coverage.md
+lints.md
+
+# Local config files
+**/config/local.*
+
+# Hidden files
+*.aes
+.env
+/*.env
+.ssh
+.tmp
+.keys
+.tmp
+*.csca
+
+# Docker
+/dockercfg
+/docker-volumes/
+
+# IDEs
+.idea
+
+# Output
+/packages/sync-server/tamanu-reports/
+
+packages/shared
