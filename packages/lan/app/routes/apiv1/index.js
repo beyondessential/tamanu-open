@@ -4,7 +4,7 @@ import { constructPermission } from 'shared/permissions/middleware';
 import { loginHandler, authMiddleware } from '../../middleware/auth';
 
 import { user } from './user';
-import { patient } from './patient';
+import { patient, patientCarePlan, patientIssue } from './patient';
 import { encounter } from './encounter';
 import { vitals } from './vitals';
 import { procedure } from './procedure';
@@ -13,12 +13,10 @@ import { triage } from './triage';
 import { referenceData } from './referenceData';
 import { diagnosis } from './diagnosis';
 import { medication } from './medication';
-import { patientIssue } from './patientIssue';
 import { allergy } from './allergy';
 import { ongoingCondition } from './ongoingCondition';
 import { note } from './note';
 import { familyHistory } from './familyHistory';
-import { additionalData } from './additionalData';
 import { labRequest, labTest } from './labs';
 import { labRequestLog } from './labRequestLog';
 import { program } from './program';
@@ -26,17 +24,14 @@ import { survey } from './survey';
 import { surveyResponse } from './surveyResponse';
 import { referral } from './referral';
 import { imagingRequest } from './imaging';
-import { immunisation } from './immunisation';
 import { reports } from './reports';
 import { reportRequest } from './reportRequest';
-import { patientCarePlan } from './patientCarePlan';
 import { appointments } from './appointments';
 import { invoices, invoiceLineTypes } from './invoice';
 import { resetPassword } from './resetPassword';
 import { changePassword } from './changePassword';
 import { certificateNotification } from './certificateNotification';
 
-import { admin } from './admin';
 import { setting } from './setting';
 import { asset } from './asset';
 import { department } from './department';
@@ -66,7 +61,6 @@ apiv1.use('/referenceData', referenceData);
 apiv1.use('/diagnosis', diagnosis);
 apiv1.use('/patientIssue', patientIssue);
 apiv1.use('/familyHistory', familyHistory);
-apiv1.use('/additionalData', additionalData);
 apiv1.use('/allergy', allergy);
 apiv1.use('/ongoingCondition', ongoingCondition);
 apiv1.use('/medication', medication);
@@ -76,7 +70,6 @@ apiv1.use('/labTest', labTest);
 apiv1.use('/labRequestLog', labRequestLog);
 apiv1.use('/referral', referral);
 apiv1.use('/imagingRequest', imagingRequest);
-apiv1.use('/immunisation', immunisation);
 apiv1.use('/scheduledVaccine', scheduledVaccine);
 apiv1.use('/program', program);
 apiv1.use('/survey', survey);
@@ -90,8 +83,6 @@ apiv1.use('/appointments', appointments);
 
 apiv1.use('/invoices', invoices);
 apiv1.use('/invoiceLineTypes', invoiceLineTypes);
-
-apiv1.use('/admin', admin);
 
 apiv1.use('/setting', setting);
 

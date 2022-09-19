@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { useEncounter } from '../../../contexts/Encounter';
 import { MedicationModal } from '../../../components/MedicationModal';
 import { EncounterMedicationTable } from '../../../components/MedicationTable';
-import { ContentPane } from '../../../components/ContentPane';
-import { Button } from '../../../components';
+import { ButtonWithPermissionCheck, TableButtonRow } from '../../../components';
+import { TabPane } from '../components';
 
 export const EncounterMedicationPane = React.memo(({ encounter, readonly }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const { loadEncounter } = useEncounter();
 
   return (
-    <div>
+    <TabPane>
       <MedicationModal
         open={modalOpen}
         encounterId={encounter.id}
@@ -20,17 +20,17 @@ export const EncounterMedicationPane = React.memo(({ encounter, readonly }) => {
           await loadEncounter(encounter.id);
         }}
       />
-      <EncounterMedicationTable encounterId={encounter.id} />
-      <ContentPane>
-        <Button
+      <TableButtonRow variant="small">
+        <ButtonWithPermissionCheck
           onClick={() => setModalOpen(true)}
-          variant="contained"
-          color="primary"
           disabled={readonly}
+          verb="create"
+          noun="EncounterMedication"
         >
           New prescription
-        </Button>
-      </ContentPane>
-    </div>
+        </ButtonWithPermissionCheck>
+      </TableButtonRow>
+      <EncounterMedicationTable encounterId={encounter.id} />
+    </TabPane>
   );
 });

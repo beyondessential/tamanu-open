@@ -1,40 +1,47 @@
-import React, { useCallback } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { push } from 'connected-react-router';
+import React, { useCallback, useState } from 'react';
+import { usePatientNavigation } from '../../../utils/usePatientNavigation';
 import { useEncounter } from '../../../contexts/Encounter';
+
+import { ContentPane } from '../../../components';
 import { PatientEncounterSummary } from '../components/PatientEncounterSummary';
 import { PatientHistory } from '../../../components/PatientHistory';
+import { EncounterModal } from '../../../components/EncounterModal';
 
-export const HistoryPane = React.memo(({ disabled }) => {
-  const dispatch = useDispatch();
-  const patient = useSelector(state => state.patient);
-  const { currentEncounter } = patient;
-
+export const HistoryPane = React.memo(({ patient, additionalData, disabled }) => {
+  const [isModalOpen, setModalOpen] = useState(false);
+  const { navigateToEncounter } = usePatientNavigation();
   const { loadEncounter } = useEncounter();
 
   const onViewEncounter = useCallback(
     id => {
       (async () => {
-        await loadEncounter(id, true);
+        await loadEncounter(id);
+        navigateToEncounter(id);
       })();
     },
-    [loadEncounter],
+    [loadEncounter, navigateToEncounter],
   );
 
-  const onOpenCheckin = () => dispatch(push('/patients/view/checkin'));
-  const onOpenTriage = () => dispatch(push('/patients/view/triage'));
+  const onCloseModal = useCallback(() => setModalOpen(false), []);
 
   return (
     <>
-      <PatientEncounterSummary
-        encounter={currentEncounter}
-        viewEncounter={onViewEncounter}
-        openCheckin={onOpenCheckin}
-        openTriage={onOpenTriage}
-        patient={patient}
-        disabled={disabled}
+      <ContentPane>
+        <PatientEncounterSummary
+          viewEncounter={onViewEncounter}
+          openCheckin={() => setModalOpen(true)}
+          patient={patient}
+          disabled={disabled}
+        />
+      </ContentPane>
+      <ContentPane>
+        <PatientHistory patient={patient} onItemClick={onViewEncounter} />
+      </ContentPane>
+      <EncounterModal
+        open={isModalOpen}
+        onClose={onCloseModal}
+        patientBillingTypeId={additionalData?.patientBillingTypeId}
       />
-      <PatientHistory patient={patient} onItemClick={onViewEncounter} />
     </>
   );
 });

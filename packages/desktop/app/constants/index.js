@@ -11,6 +11,12 @@ import {
   REFERRAL_STATUSES,
   INVOICE_STATUSES,
   INVOICE_PAYMENT_STATUSES,
+  PATIENT_REGISTRY_TYPES,
+  BIRTH_DELIVERY_TYPES,
+  BIRTH_TYPES,
+  PLACE_OF_BIRTH_TYPES,
+  ATTENDANT_OF_BIRTH_TYPES,
+  LAB_REQUEST_STATUSES,
 } from 'shared/constants';
 
 import {
@@ -48,6 +54,7 @@ export const Colors = {
   midText: '#888888',
   softText: '#b8b8b8',
   outline: '#dedede',
+  softOutline: '#ebebeb',
   background: '#f3f5f7',
   white: '#ffffff',
   offWhite: '#fafafa',
@@ -60,22 +67,6 @@ export const MAX_AUTO_COMPLETE_ITEMS = {
   DIAGNOSES: 10,
 };
 
-export const LAB_REQUEST_STATUSES = {
-  RECEPTION_PENDING: 'reception_pending',
-  RESULTS_PENDING: 'results_pending',
-  TO_BE_VERIFIED: 'to_be_verified',
-  VERIFIED: 'verified',
-  PUBLISHED: 'published',
-};
-
-export const LAB_REQUEST_STATUS_LABELS = {
-  [LAB_REQUEST_STATUSES.RECEPTION_PENDING]: 'Reception pending',
-  [LAB_REQUEST_STATUSES.RESULTS_PENDING]: 'Results pending',
-  [LAB_REQUEST_STATUSES.TO_BE_VERIFIED]: 'To be verified',
-  [LAB_REQUEST_STATUSES.VERIFIED]: 'Verified',
-  [LAB_REQUEST_STATUSES.PUBLISHED]: 'Published',
-};
-
 export const LAB_REQUEST_COLORS = {
   [LAB_REQUEST_STATUSES.RECEPTION_PENDING]: '#faa',
   [LAB_REQUEST_STATUSES.RESULTS_PENDING]: '#aaf',
@@ -83,12 +74,6 @@ export const LAB_REQUEST_COLORS = {
   [LAB_REQUEST_STATUSES.VERIFIED]: '#5af',
   [LAB_REQUEST_STATUSES.PUBLISHED]: '#afa',
   unknown: '#333',
-};
-
-export const IMAGING_REQUEST_STATUS_LABELS = {
-  [IMAGING_REQUEST_STATUS_TYPES.PENDING]: 'Pending',
-  [IMAGING_REQUEST_STATUS_TYPES.COMPLETED]: 'Completed',
-  [IMAGING_REQUEST_STATUS_TYPES.IN_PROGRESS]: 'In progress',
 };
 
 export const IMAGING_REQUEST_COLORS = {
@@ -232,18 +217,23 @@ export const noteTypes = [
 
 export const encounterOptions = [
   { value: ENCOUNTER_TYPES.ADMISSION, label: 'Hospital admission', image: medicationIcon },
-  { value: ENCOUNTER_TYPES.CLINIC, label: 'Clinic', image: administrationIcon },
-  { value: ENCOUNTER_TYPES.IMAGING, label: 'Imaging', image: radiologyIcon },
-  { value: ENCOUNTER_TYPES.EMERGENCY, label: 'Emergency short stay', image: scheduleIcon },
   {
-    value: ENCOUNTER_TYPES.OBSERVATION,
-    label: 'Active ED patient',
+    value: ENCOUNTER_TYPES.TRIAGE,
+    label: 'Triage',
     image: patientIcon,
     triageFlowOnly: true,
   },
+  { value: ENCOUNTER_TYPES.CLINIC, label: 'Clinic', image: administrationIcon },
+  { value: ENCOUNTER_TYPES.IMAGING, label: 'Imaging', image: radiologyIcon, hideFromMenu: true },
   {
-    value: ENCOUNTER_TYPES.TRIAGE,
-    label: 'Triaged patient',
+    value: ENCOUNTER_TYPES.EMERGENCY,
+    label: 'Emergency short stay',
+    image: scheduleIcon,
+    hideFromMenu: true,
+  },
+  {
+    value: ENCOUNTER_TYPES.OBSERVATION,
+    label: 'Active ED patient',
     image: patientIcon,
     triageFlowOnly: true,
     hideFromMenu: true,
@@ -257,24 +247,6 @@ export const encounterOptions = [
 ];
 
 export const ENCOUNTER_OPTIONS_BY_VALUE = createValueIndex(encounterOptions);
-
-export const TRIAGE_COLORS_BY_LEVEL = {
-  1: Colors.alert,
-  2: Colors.secondary,
-  3: Colors.safe,
-};
-
-export const triagePriorities = [
-  { value: '1', label: 'Emergency', color: TRIAGE_COLORS_BY_LEVEL[1] },
-  { value: '2', label: 'Priority', color: TRIAGE_COLORS_BY_LEVEL[2] },
-  { value: '3', label: 'Non-urgent', color: TRIAGE_COLORS_BY_LEVEL[3] },
-];
-
-export const immunisationStatusList = [
-  { value: 'On time', label: 'On time', color: TRIAGE_COLORS_BY_LEVEL[3] },
-  { value: 'Late', label: 'Late', color: TRIAGE_COLORS_BY_LEVEL[2] },
-  { value: 'Missing', label: 'Missing', color: TRIAGE_COLORS_BY_LEVEL[1] },
-];
 
 export const operativePlanStatuses = {
   PLANNED: 'planned',
@@ -369,23 +341,6 @@ export const LOCAL_STORAGE_KEYS = {
   PERMISSIONS: 'permissions',
 };
 
-export const REPORT_DATA_SOURCES = {
-  THIS_FACILITY: 'thisFacility',
-  ALL_FACILITIES: 'allFacilities',
-};
-
-export const CLINICAL_STATUSES = {
-  CRITICAL: 'Critical',
-  NEEDS_REVIEW: 'Needs review',
-  LOW_RISK: 'Low risk',
-};
-
-export const CLINICAL_COLORS_BY_STATUS = {
-  [CLINICAL_STATUSES.CRITICAL]: Colors.alert,
-  [CLINICAL_STATUSES.NEEDS_REVIEW]: Colors.secondary,
-  [CLINICAL_STATUSES.LOW_RISK]: Colors.safe,
-};
-
 export const appointmentTypeOptions = Object.values(APPOINTMENT_TYPES).map(type => ({
   label: type,
   value: type,
@@ -400,6 +355,7 @@ export const ALPHABET_FOR_ID =
   // this is absolutely fine and the concat isn't useless
   // eslint-disable-next-line no-useless-concat
   'ABCDEFGH' + /* I */ 'JK' + /* L */ 'MN' + /* O */ 'PQRSTUVWXYZ' + /* 01 */ '23456789';
+
 export const INVOICE_STATUS_OPTIONS = [
   { label: 'Cancelled', value: INVOICE_STATUSES.CANCELLED },
   { label: 'In progress', value: INVOICE_STATUSES.IN_PROGRESS },
@@ -426,4 +382,41 @@ export const INVOICE_PAYMENT_STATUS_LABELS = {
 export const INVOICE_PAYMENT_STATUS_OPTIONS = [
   { label: 'Unpaid', value: INVOICE_PAYMENT_STATUSES.UNPAID },
   { label: 'Paid', value: INVOICE_PAYMENT_STATUSES.PAID },
+];
+
+export const BIRTH_DELIVERY_TYPE_OPTIONS = [
+  { value: BIRTH_DELIVERY_TYPES.NORMAL_VAGINAL_DELIVERY, label: 'Normal vaginal delivery' },
+  { value: BIRTH_DELIVERY_TYPES.BREECH, label: 'Breech' },
+  { value: BIRTH_DELIVERY_TYPES.EMERGENCY_C_SECTION, label: 'Emergency C-section' },
+  { value: BIRTH_DELIVERY_TYPES.ELECTIVE_C_SECTION, label: 'Elective C-section' },
+  { value: BIRTH_DELIVERY_TYPES.VACUUM_EXTRACTION, label: 'Vacuum extraction' },
+  { value: BIRTH_DELIVERY_TYPES.FORCEPS, label: 'Forceps' },
+  { value: BIRTH_DELIVERY_TYPES.OTHER, label: 'Other' },
+];
+
+export const BIRTH_TYPE_OPTIONS = [
+  { value: BIRTH_TYPES.SINGLE, label: 'Single' },
+  { value: BIRTH_TYPES.PLURAL, label: 'Plural' },
+];
+
+export const PLACE_OF_BIRTH_OPTIONS = [
+  { value: PLACE_OF_BIRTH_TYPES.HEALTH_FACILITY, label: 'Health facility' },
+  { value: PLACE_OF_BIRTH_TYPES.HOME, label: 'Home' },
+  { value: PLACE_OF_BIRTH_TYPES.OTHER, label: 'Other' },
+];
+
+export const ATTENDANT_OF_BIRTH_OPTIONS = [
+  { value: ATTENDANT_OF_BIRTH_TYPES.DOCTOR, label: 'Doctor' },
+  { value: ATTENDANT_OF_BIRTH_TYPES.MIDWIFE, label: 'Midwife' },
+  { value: ATTENDANT_OF_BIRTH_TYPES.NURSE, label: 'Nurse' },
+  {
+    value: ATTENDANT_OF_BIRTH_TYPES.TRADITIONAL_BIRTH_ATTENDANT,
+    label: 'Traditional birth attendant',
+  },
+  { value: ATTENDANT_OF_BIRTH_TYPES.OTHER, label: 'Other' },
+];
+
+export const PATIENT_REGISTRY_OPTIONS = [
+  { value: PATIENT_REGISTRY_TYPES.NEW_PATIENT, label: 'Create new patient' },
+  { value: PATIENT_REGISTRY_TYPES.BIRTH_REGISTRY, label: 'Register birth' },
 ];

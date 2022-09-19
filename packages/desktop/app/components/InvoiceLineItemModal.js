@@ -1,15 +1,13 @@
 import React, { useCallback } from 'react';
 import * as yup from 'yup';
-
+import { getCurrentDateTimeString } from 'shared/utils/dateTime';
 import { useApi } from '../api';
 import { Suggester } from '../utils/suggester';
 import { foreignKey } from '../utils/validation';
-
 import { Modal } from './Modal';
 import { Form, Field, DateField, AutocompleteField, NumberField } from './Field';
 import { FormGrid } from './FormGrid';
-import { Button } from './Button';
-import { ButtonRow } from './ButtonRow';
+import { ConfirmCancelRow } from './ButtonRow';
 
 export const InvoiceLineItemModal = ({
   title,
@@ -49,7 +47,7 @@ export const InvoiceLineItemModal = ({
           invoiceLineItem.percentageChange && invoiceLineItem.percentageChange * 100,
       }
     : {
-        dateGenerated: new Date(),
+        dateGenerated: getCurrentDateTimeString(),
       };
 
   return (
@@ -58,7 +56,13 @@ export const InvoiceLineItemModal = ({
         onSubmit={createOrUpdateLineItem}
         render={({ submitForm }) => (
           <FormGrid>
-            <Field name="dateGenerated" label="Date" required component={DateField} />
+            <Field
+              name="dateGenerated"
+              label="Date"
+              required
+              component={DateField}
+              saveDateAsString
+            />
             <Field
               name="invoiceLineTypeId"
               label="Details"
@@ -79,14 +83,7 @@ export const InvoiceLineItemModal = ({
               label="Discount/markup % (-/+)"
               component={NumberField}
             />
-            <ButtonRow>
-              <Button variant="outlined" onClick={onClose} color="primary">
-                Cancel
-              </Button>
-              <Button variant="contained" onClick={submitForm} color="primary">
-                {actionText}
-              </Button>
-            </ButtonRow>
+            <ConfirmCancelRow confirmText={actionText} onConfirm={submitForm} onCancel={onClose} />
           </FormGrid>
         )}
         initialValues={initialValues}

@@ -16,14 +16,14 @@ const MARKED_FOR_PUSH_MODELS = [
   'PatientCondition',
   'PatientFamilyHistory',
   'PatientIssue',
+  'PatientSecondaryId',
   'ReportRequest',
   'UserFacility',
   'DocumentMetadata',
   'CertificateNotification',
-
-  // Temporarily remove death data models from sync as sync cannot handle the foreign key cycle
-  // 'PatientDeathData',
-  // 'DeathCause',
+  'PatientDeathData',
+  'PatientBirthData',
+  'ContributingDeathCause',
 ];
 
 export class Model extends sequelize.Model {
@@ -40,9 +40,11 @@ export class Model extends sequelize.Model {
         allowNull: false,
         defaultValue: false,
       };
+      attributes.deletedAt = Sequelize.DATE;
       attributes.pushedAt = Sequelize.DATE;
       attributes.pulledAt = Sequelize.DATE;
     }
+    attributes.deletedAt = Sequelize.DATE;
     super.init(attributes, options);
     this.syncClientMode = syncClientMode;
     this.defaultIdValue = attributes.id.defaultValue;
@@ -111,9 +113,14 @@ export class Model extends sequelize.Model {
     return this.getListReferenceAssociations(models);
   }
 
-  static async findByIds(ids) {
+  static async findByIds(ids, paranoid = true) {
+    if (ids.length === 0) return [];
+
     return this.findAll({
-      where: { id: { [Op.in]: ids } },
+      where: {
+        id: { [Op.in]: ids },
+      },
+      paranoid,
     });
   }
 

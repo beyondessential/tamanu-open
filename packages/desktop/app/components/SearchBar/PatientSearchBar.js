@@ -1,4 +1,5 @@
 import React from 'react';
+import { format } from 'date-fns';
 import { CustomisableSearchBar } from './CustomisableSearchBar';
 import {
   AutocompleteField,
@@ -10,10 +11,13 @@ import {
 } from '../Field';
 import { useSuggester } from '../../api';
 
-export const PatientSearchBar = React.memo(({ onSearch }) => {
-  const facilitySuggester = useSuggester('facility');
-  const locationSuggester = useSuggester('location');
-  const departmentSuggester = useSuggester('department');
+export const PatientSearchBar = React.memo(({ onSearch, suggestByFacility = true }) => {
+  const locationSuggester = useSuggester('location', {
+    baseQueryParameters: suggestByFacility ? { filterByFacility: true } : {},
+  });
+  const departmentSuggester = useSuggester('department', {
+    baseQueryParameters: suggestByFacility ? { filterByFacility: true } : {},
+  });
   const practitionerSuggester = useSuggester('practitioner');
   return (
     <CustomisableSearchBar
@@ -26,14 +30,13 @@ export const PatientSearchBar = React.memo(({ onSearch }) => {
     >
       <LocalisedField name="firstName" />
       <LocalisedField name="lastName" />
-      <Field name="dateOfBirthExact" label="DOB" component={DateField} />
-      <DisplayIdField />
-      <LocalisedField
-        name="facilityId"
-        defaultLabel="Facility"
-        component={AutocompleteField}
-        suggester={facilitySuggester}
+      <Field
+        name="dateOfBirthExact"
+        label="DOB"
+        max={format(new Date(), 'yyyy-MM-dd')}
+        component={DateField}
       />
+      <DisplayIdField />
       <LocalisedField
         name="locationId"
         defaultLabel="Location"

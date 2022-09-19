@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { useEncounter } from '../../../contexts/Encounter';
 import { NoteModal } from '../../../components/NoteModal';
 import { NoteTable } from '../../../components/NoteTable';
-import { ContentPane } from '../../../components/ContentPane';
-import { Button } from '../../../components';
+import { ButtonWithPermissionCheck, TableButtonRow } from '../../../components';
+import { TabPane } from '../components';
 
 export const NotesPane = React.memo(({ encounter, readonly }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const { loadEncounter } = useEncounter();
 
   return (
-    <div>
+    <TabPane>
       <NoteModal
         open={modalOpen}
         encounterId={encounter.id}
@@ -20,17 +20,17 @@ export const NotesPane = React.memo(({ encounter, readonly }) => {
           await loadEncounter(encounter.id);
         }}
       />
-      <NoteTable encounterId={encounter.id} />
-      <ContentPane>
-        <Button
+      <TableButtonRow variant="small">
+        <ButtonWithPermissionCheck
           onClick={() => setModalOpen(true)}
-          variant="contained"
-          color="primary"
           disabled={readonly}
+          verb="write"
+          noun="Encounter"
         >
           New note
-        </Button>
-      </ContentPane>
-    </div>
+        </ButtonWithPermissionCheck>
+      </TableButtonRow>
+      <NoteTable encounterId={encounter.id} />
+    </TabPane>
   );
 });
