@@ -1,16 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
-import styled from 'styled-components';
+import { usePatientNavigation } from '../../utils/usePatientNavigation';
+import { reloadPatient } from '../../store/patient';
 
-import { viewPatient } from '../../store/patient';
 import {
   TopBar,
   PageContainer,
   DataFetchingTable,
   AllPatientsSearchBar,
   PatientSearchBar,
+  ContentPane,
 } from '../../components';
-import { DropdownButton } from '../../components/DropdownButton';
+import { ButtonWithPermissionCheck } from '../../components/Button';
 import { NewPatientModal } from './components';
 import {
   markedForSync,
@@ -25,6 +26,7 @@ import {
   location,
   department,
 } from './columns';
+import { useAuth } from '../../contexts/Auth';
 
 const PATIENT_SEARCH_ENDPOINT = 'patient';
 
@@ -50,24 +52,21 @@ const INPATIENT_COLUMNS = [markedForSync, displayId, firstName, lastName, sex, d
   // location and department should be sortable
   .concat([location, department]);
 
-const StyledDataTable = styled(DataFetchingTable)`
-  margin: 24px;
-`;
-
-const PatientTable = ({ onViewPatient, columns, fetchOptions, searchParameters }) => {
+const PatientTable = ({ columns, fetchOptions, searchParameters }) => {
+  const { navigateToPatient } = usePatientNavigation();
   const dispatch = useDispatch();
   const fetchOptionsWithSearchParameters = { ...searchParameters, ...fetchOptions };
+
+  const handleViewPatient = async row => {
+    await dispatch(reloadPatient(row.id));
+    navigateToPatient(row.id);
+  };
+
   return (
-    <StyledDataTable
+    <DataFetchingTable
       columns={columns}
       noDataMessage="No patients found"
-      onRowClick={row => {
-        if (onViewPatient) {
-          onViewPatient(row.id);
-        } else {
-          dispatch(viewPatient(row.id));
-        }
-      }}
+      onRowClick={handleViewPatient}
       rowStyle={({ patientStatus }) =>
         patientStatus === 'deceased' ? '& > td:not(:first-child) { color: #ed333a; }' : ''
       }
@@ -78,43 +77,41 @@ const PatientTable = ({ onViewPatient, columns, fetchOptions, searchParameters }
 };
 
 const NewPatientButton = ({ onCreateNewPatient }) => {
+  const { navigateToPatient } = usePatientNavigation();
   const [isCreatingPatient, setCreatingPatient] = useState(false);
-  const [isBirth, setIsBirth] = useState(false);
   const dispatch = useDispatch();
   const hideModal = useCallback(() => setCreatingPatient(false), [setCreatingPatient]);
 
   const showNewPatient = useCallback(() => {
     setCreatingPatient(true);
-    setIsBirth(false);
   }, []);
 
-  const showNewBirth = useCallback(() => {
-    setCreatingPatient(true);
-    setIsBirth(true);
-  }, []);
+  const handleCreateNewPatient = async newPatient => {
+    setCreatingPatient(false);
+    if (onCreateNewPatient) {
+      onCreateNewPatient(newPatient.id);
+    } else {
+      await dispatch(reloadPatient(newPatient.id));
+    }
+    navigateToPatient(newPatient.id);
+  };
 
   return (
     <>
-      <DropdownButton
+      <ButtonWithPermissionCheck
+        variant="outlined"
         color="primary"
-        actions={[
-          { label: 'Create new patient', onClick: showNewPatient },
-          { label: 'Register birth', onClick: showNewBirth },
-        ]}
-      />
+        verb="create"
+        noun="Patient"
+        onClick={showNewPatient}
+      >
+        + Add new patient
+      </ButtonWithPermissionCheck>
       <NewPatientModal
         title="New patient"
-        isBirth={isBirth}
         open={isCreatingPatient}
         onCancel={hideModal}
-        onCreateNewPatient={newPatient => {
-          setCreatingPatient(false);
-          if (onCreateNewPatient) {
-            onCreateNewPatient(newPatient.id);
-          } else {
-            dispatch(viewPatient(newPatient.id));
-          }
-        }}
+        onCreateNewPatient={handleCreateNewPatient}
       />
     </>
   );
@@ -128,41 +125,51 @@ export const PatientListingView = ({ onViewPatient }) => {
         <NewPatientButton onCreateNewPatient={onViewPatient} />
       </TopBar>
       <AllPatientsSearchBar onSearch={setSearchParameters} />
-      <PatientTable
-        onViewPatient={onViewPatient}
-        searchParameters={searchParameters}
-        columns={LISTING_COLUMNS}
-      />
+      <ContentPane>
+        <PatientTable
+          onViewPatient={onViewPatient}
+          searchParameters={searchParameters}
+          columns={LISTING_COLUMNS}
+        />
+      </ContentPane>
     </PageContainer>
   );
 };
 
 export const AdmittedPatientsView = () => {
   const [searchParameters, setSearchParameters] = useState({});
+  const { facility } = useAuth();
+
   return (
     <PageContainer>
       <TopBar title="Admitted patient listing" />
       <PatientSearchBar onSearch={setSearchParameters} />
-      <PatientTable
-        fetchOptions={{ inpatient: 1 }}
-        searchParameters={searchParameters}
-        columns={INPATIENT_COLUMNS}
-      />
+      <ContentPane>
+        <PatientTable
+          fetchOptions={{ inpatient: 1 }}
+          searchParameters={{ facilityId: facility.id, ...searchParameters }}
+          columns={INPATIENT_COLUMNS}
+        />
+      </ContentPane>
     </PageContainer>
   );
 };
 
 export const OutpatientsView = () => {
   const [searchParameters, setSearchParameters] = useState({});
+  const { facility } = useAuth();
+
   return (
     <PageContainer>
       <TopBar title="Outpatient listing" />
       <PatientSearchBar onSearch={setSearchParameters} />
-      <PatientTable
-        fetchOptions={{ outpatient: 1 }}
-        searchParameters={searchParameters}
-        columns={INPATIENT_COLUMNS}
-      />
+      <ContentPane>
+        <PatientTable
+          fetchOptions={{ outpatient: 1 }}
+          searchParameters={{ facilityId: facility.id, ...searchParameters }}
+          columns={INPATIENT_COLUMNS}
+        />
+      </ContentPane>
     </PageContainer>
   );
 };

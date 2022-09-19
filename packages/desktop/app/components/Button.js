@@ -1,5 +1,5 @@
 import React from 'react';
-import { isEmpty } from 'lodash';
+import PropTypes from 'prop-types';
 import styled from 'styled-components';
 import { Link } from 'react-router-dom';
 
@@ -16,15 +16,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Refresh,
+  Lock,
 } from '@material-ui/icons';
 
-import { checkAbility } from '../utils/ability';
 import { Colors } from '../constants';
+import { withPermissionCheck } from './withPermissionCheck';
+import { withPermissionTooltip } from './withPermissionTooltip';
 
-export const ButtonBase = ({ disabled, ...props }) => {
-  const allowed = isAllowed(props);
+export const ButtonBase = props => {
   const locationsProps = getLocationProps(props);
-  return <MuiButtonBase {...props} {...locationsProps} disabled={!allowed || disabled} />;
+  return <MuiButtonBase {...props} {...locationsProps} />;
 };
 
 const StyledButton = styled(MuiButton)`
@@ -32,21 +33,46 @@ const StyledButton = styled(MuiButton)`
   font-size: 14px;
   line-height: 16px;
   text-transform: none;
-  padding: 11px 20px 12px;
+  padding: 12px 20px;
   box-shadow: none;
+
+  .MuiSvgIcon-root {
+    width: 19.5px;
+    height: auto;
+    margin-right: 10px;
+  }
 `;
 
-export const Button = ({ children, isSubmitting, disabled, ...props }) => {
-  const allowed = isAllowed(props);
+export const Button = ({ children, isSubmitting, disabled, hasPermission = true, ...props }) => {
   const locationsProps = getLocationProps(props);
+  const displayLock = !isSubmitting && !hasPermission;
   return (
-    <StyledButton {...props} {...locationsProps} disabled={!allowed || disabled || isSubmitting}>
+    <StyledButton
+      {...props}
+      {...locationsProps}
+      disabled={disabled || isSubmitting || !hasPermission}
+    >
       {isSubmitting && (
         <Icon className="fa fa-spinner fa-spin" style={{ marginRight: 4, fontSize: 18 }} />
       )}
+      {displayLock && <Lock />}
       {children}
     </StyledButton>
   );
+};
+
+Button.propTypes = {
+  isSubmitting: PropTypes.bool,
+  disabled: PropTypes.bool,
+  variant: PropTypes.PropTypes.oneOf(['contained', 'outlined', 'text']),
+  color: PropTypes.PropTypes.oneOf(['default', 'primary', 'secondary']),
+};
+
+Button.defaultProps = {
+  isSubmitting: false,
+  disabled: false,
+  variant: 'contained',
+  color: 'primary',
 };
 
 const StyledOutlinedButton = styled(StyledButton)`
@@ -56,6 +82,11 @@ const StyledOutlinedButton = styled(StyledButton)`
 export const OutlinedButton = props => (
   <StyledOutlinedButton variant="outlined" color="primary" {...props} />
 );
+
+export const GreyOutlinedButton = styled(props => <StyledButton {...props} />)`
+  border: 1px solid #dedede;
+  color: ${props => props.theme.palette.text.secondary};
+`;
 
 const StyledLargeButton = styled(StyledButton)`
   font-size: 15px;
@@ -150,6 +181,12 @@ export const NewButton = ({ children, ...props }) => (
   </Button>
 );
 
+export const ViewButton = props => (
+  <Button variant="contained" color="primary" {...props}>
+    View
+  </Button>
+);
+
 const StyledTextButton = styled(Button)`
   font-size: 16px;
   text-transform: capitalize;
@@ -172,7 +209,11 @@ export const TextButton = ({ children, ...props }) => (
 
 const StyledNavButton = styled(TextButton)`
   color: ${Colors.primary};
-  font-size: 14px;
+  padding-right: 8px;
+  font-size: 12px;
+  & svg {
+    font-size: 20px;
+  }
 `;
 
 export const ForwardButton = ({ children, ...props }) => (
@@ -224,18 +265,12 @@ export const RefreshIconButton = ({ ...props }) => (
   </IconButton>
 );
 
-const isAllowed = ({ can = {} }) => {
-  let allowed = true;
-  const { do: action, on: subject, field } = can;
-  if (!isEmpty(can)) {
-    allowed = checkAbility({ action, subject, field });
-  }
-  return allowed;
-};
-
 const getLocationProps = ({ to }) => {
   if (to) {
     return { component: Link, to };
   }
   return {};
 };
+
+const ButtonWithPermissionTooltip = withPermissionTooltip(Button);
+export const ButtonWithPermissionCheck = withPermissionCheck(ButtonWithPermissionTooltip);

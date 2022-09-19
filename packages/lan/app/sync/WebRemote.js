@@ -1,7 +1,12 @@
 import fetch from 'node-fetch';
 import config from 'config';
 
-import { BadAuthenticationError, InvalidOperationError, RemoteTimeoutError } from 'shared/errors';
+import {
+  BadAuthenticationError,
+  FacilityAndSyncVersionIncompatibleError,
+  RemoteTimeoutError,
+  RemoteCallFailedError,
+} from 'shared/errors';
 import { VERSION_COMPATIBILITY_ERRORS } from 'shared/constants';
 import { getResponseJsonSafely } from 'shared/utils';
 import { log } from 'shared/services/logging';
@@ -28,6 +33,7 @@ const getVersionIncompatibleMessage = (error, response) => {
 
 const objectToQueryString = obj =>
   Object.entries(obj)
+    .filter(([k, v]) => k !== undefined && v !== undefined)
     .map(kv => kv.map(str => encodeURIComponent(str)).join('='))
     .join('&');
 
@@ -98,8 +104,8 @@ export class WebRemote {
           },
           this.fetchImplementation,
         );
-        const checkForInvalidToken = ({ status }) => status === 401;
-        if (checkForInvalidToken(response)) {
+        const isInvalidToken = response?.status === 401;
+        if (isInvalidToken) {
           if (retryAuth) {
             log.warn('Token was invalid - reconnecting to sync server');
             await this.connect();
@@ -116,12 +122,12 @@ export class WebRemote {
           if (response.status === 400 && error) {
             const versionIncompatibleMessage = getVersionIncompatibleMessage(error, response);
             if (versionIncompatibleMessage) {
-              throw new InvalidOperationError(versionIncompatibleMessage);
+              throw new FacilityAndSyncVersionIncompatibleError(versionIncompatibleMessage);
             }
           }
 
           const errorMessage = error ? error.message : 'no error message given';
-          const err = new InvalidOperationError(
+          const err = new RemoteCallFailedError(
             `Server responded with status code ${response.status} (${errorMessage})`,
           );
           // attach status and body from response
@@ -251,8 +257,8 @@ export class WebRemote {
     return channelsWithPendingChanges;
   }
 
-  async pull(channel, { since = 0, limit = 100, page = 0, noCount = 'false' } = {}) {
-    const query = { since, limit, page, noCount };
+  async pull(channel, { since = 0, until, limit = 100, page = 0, noCount = 'false' } = {}) {
+    const query = { since, limit, page, noCount, until };
     const path = `sync/${encodeURIComponent(channel)}?${objectToQueryString(query)}`;
     return this.fetch(path);
   }

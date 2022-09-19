@@ -3,8 +3,8 @@ import qs from 'qs';
 
 import { buildAbilityForUser } from 'shared/permissions/buildAbility';
 import { VERSION_COMPATIBILITY_ERRORS, SERVER_TYPES } from 'shared/constants';
+import { ForbiddenError } from 'shared/errors';
 import { LOCAL_STORAGE_KEYS } from '../constants';
-import { setForbiddenError } from '../store';
 
 const { HOST, TOKEN, LOCALISATION, SERVER, PERMISSIONS } = LOCAL_STORAGE_KEYS;
 
@@ -90,16 +90,11 @@ export class TamanuApi {
     this.authHeader = null;
     this.onVersionIncompatible = null;
     this.user = null;
-    this.reduxStore = null;
 
     const host = window.localStorage.getItem(HOST);
     if (host) {
       this.setHost(host);
     }
-  }
-
-  setReduxStore(store) {
-    this.reduxStore = store;
   }
 
   setHost(host) {
@@ -139,8 +134,9 @@ export class TamanuApi {
       throw new Error(`Tamanu server type '${serverType}' is not supported.`);
     }
 
-    const { token, localisation, server = {}, permissions } = await response.json();
+    const { token, localisation, server = {}, permissions, centralHost } = await response.json();
     server.type = serverType;
+    server.centralHost = centralHost;
     saveToLocalStorage({ token, localisation, server, permissions });
     this.setToken(token);
     this.lastRefreshed = Date.now();
@@ -209,8 +205,8 @@ export class TamanuApi {
     const { error } = await getResponseJsonSafely(response);
 
     // handle forbidden error and trigger catch all modal
-    if (response.status === 403 && error && this.reduxStore) {
-      this.reduxStore.dispatch(setForbiddenError(error));
+    if (response.status === 403 && error) {
+      throw new ForbiddenError(error?.message);
     }
 
     // handle auth expiring

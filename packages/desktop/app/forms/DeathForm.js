@@ -4,6 +4,7 @@ import { Typography } from '@material-ui/core';
 import styled from 'styled-components';
 import moment from 'moment';
 import MuiBox from '@material-ui/core/Box';
+import { MANNER_OF_DEATHS, MANNER_OF_DEATH_OPTIONS } from 'shared/constants';
 import {
   ArrayField,
   Button,
@@ -144,28 +145,20 @@ const placeOptions = Object.values(PLACES).map(type => ({
   value: type,
 }));
 
-const MANNER_OF_DEATHS = [
-  'Disease',
-  'Assault',
-  'Accident',
-  'Legal Intervention',
-  'Pending Investigation',
-  'Intentional Self Harm',
-  'War',
-  'Unknown/Could not be determined',
-];
-
-const mannerOfDeathOptions = Object.values(MANNER_OF_DEATHS).map(type => ({
-  label: type,
-  value: type,
-}));
-
 const mannerOfDeathVisibilityCriteria = {
   mannerOfDeath: MANNER_OF_DEATHS.filter(x => x !== 'Disease'),
 };
 
 export const DeathForm = React.memo(
-  ({ onCancel, onSubmit, patient, practitionerSuggester, icd10Suggester, facilitySuggester }) => {
+  ({
+    onCancel,
+    onSubmit,
+    patient,
+    hasCurrentEncounter,
+    practitionerSuggester,
+    icd10Suggester,
+    facilitySuggester,
+  }) => {
     const patientYearsOld = moment().diff(patient.dateOfBirth, 'years');
     const isAdultFemale = patient.sex === 'female' && patientYearsOld >= 12;
 
@@ -176,7 +169,7 @@ export const DeathForm = React.memo(
       <PaginatedForm
         onSubmit={onSubmit}
         onCancel={onCancel}
-        SummaryScreen={patient.currentEncounter ? DoubleConfirmScreen : ConfirmScreen}
+        SummaryScreen={hasCurrentEncounter ? DoubleConfirmScreen : ConfirmScreen}
         validationSchema={yup.object().shape({
           causeOfDeath: yup.string().required(),
           causeOfDeathInterval: yup
@@ -274,6 +267,7 @@ export const DeathForm = React.memo(
             name="timeOfDeath"
             label="Date/Time"
             component={props => <DateTimeField {...props} InputProps={{}} />}
+            saveDateAsString
             required
           />
           <Field
@@ -293,14 +287,14 @@ export const DeathForm = React.memo(
           <Field
             name="surgeryInLast4Weeks"
             label="Was surgery performed in the last 4 weeks?"
-            inline
             component={RadioField}
             options={binaryUnknownOptions}
           />
           <Field
             name="lastSurgeryDate"
             label="What was the date of surgery"
-            component={DateTimeField}
+            component={DateField}
+            saveDateAsString
             visibilityCriteria={{ surgeryInLast4Weeks: 'yes' }}
           />
           <Field
@@ -315,17 +309,16 @@ export const DeathForm = React.memo(
           <StyledFormGrid columns={1}>
             <Field
               name="pregnant"
-              label="If this was a woman, was the woman pregnant?"
-              inline
+              label="Was the woman pregnant?"
               component={RadioField}
               options={binaryUnknownOptions}
             />
             <Field
               name="pregnancyContribute"
               label="Did the pregnancy contribute to the death?"
-              inline
               component={RadioField}
               options={binaryUnknownOptions}
+              visibilityCriteria={{ pregnant: 'yes' }}
             />
           </StyledFormGrid>
         ) : null}
@@ -334,12 +327,14 @@ export const DeathForm = React.memo(
             name="mannerOfDeath"
             label="What was the manner of death?"
             component={SelectField}
-            options={mannerOfDeathOptions}
+            options={MANNER_OF_DEATH_OPTIONS}
+            required
           />
           <Field
             name="mannerOfDeathDate"
             label="What date did this external cause occur?"
             component={DateField}
+            saveDateAsString
             visibilityCriteria={mannerOfDeathVisibilityCriteria}
           />
           <Field

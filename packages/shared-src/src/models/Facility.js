@@ -1,5 +1,5 @@
 import { Sequelize } from 'sequelize';
-import { SYNC_DIRECTIONS } from 'shared/constants';
+import { SYNC_DIRECTIONS, VISIBILITY_STATUSES } from 'shared/constants';
 import { Model } from './Model';
 
 export class Facility extends Model {
@@ -21,6 +21,10 @@ export class Facility extends Model {
         cityTown: Sequelize.STRING,
         division: Sequelize.STRING,
         type: Sequelize.STRING,
+        visibilityStatus: {
+          type: Sequelize.TEXT,
+          defaultValue: VISIBILITY_STATUSES.CURRENT,
+        },
       },
       {
         ...options,
@@ -42,6 +46,9 @@ export class Facility extends Model {
     });
     this.hasMany(models.UserFacility, {
       foreignKey: 'facilityId',
+    });
+    this.hasMany(models.PatientBirthData, {
+      foreignKey: 'birthFacilityId',
     });
 
     this.belongsToMany(models.User, {

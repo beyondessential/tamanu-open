@@ -7,12 +7,14 @@ import { EmailButton } from './Email/EmailButton';
 import { useCertificate } from '../utils/useCertificate';
 import { PDFViewer, printPDF } from './PatientPrinting/PDFViewer';
 import { useLocalisation } from '../contexts/Localisation';
+import { usePatientAdditionalData } from '../api/queries';
 
-export const ImmunisationCertificateModal = ({ open, onClose, patient }) => {
+export const ImmunisationCertificateModal = React.memo(({ open, onClose, patient }) => {
   const api = useApi();
   const [vaccinations, setVaccinations] = useState([]);
   const { getLocalisation } = useLocalisation();
   const { watermark, logo, footerImg, printedBy } = useCertificate();
+  const { data: additionalData } = usePatientAdditionalData(patient.id);
 
   useEffect(() => {
     api.get(`patient/${patient.id}/administeredVaccines`).then(response => {
@@ -33,6 +35,8 @@ export const ImmunisationCertificateModal = ({ open, onClose, patient }) => {
     [api, patient.id, printedBy],
   );
 
+  const patientData = { ...patient, additionalData };
+
   return (
     <Modal
       title="Vaccination Certificate"
@@ -40,12 +44,13 @@ export const ImmunisationCertificateModal = ({ open, onClose, patient }) => {
       onClose={onClose}
       width="md"
       printable
+      keepMounted
       onPrint={() => printPDF('vaccine-certificate')}
       additionalActions={<EmailButton onEmail={createImmunisationCertificateNotification} />}
     >
       <PDFViewer id="vaccine-certificate">
         <VaccineCertificate
-          patient={patient}
+          patient={patientData}
           vaccinations={vaccinations}
           watermarkSrc={watermark}
           logoSrc={logo}
@@ -56,4 +61,4 @@ export const ImmunisationCertificateModal = ({ open, onClose, patient }) => {
       </PDFViewer>
     </Modal>
   );
-};
+});

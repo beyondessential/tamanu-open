@@ -1,32 +1,39 @@
 import React, { useCallback } from 'react';
 import { useEncounter } from '../contexts/Encounter';
+import { useSuggester } from '../api';
+import { usePatientNavigation } from '../utils/usePatientNavigation';
 
 import { Form, Field, AutocompleteField } from './Field';
 import { ConfirmCancelRow } from './ButtonRow';
 import { FormGrid } from './FormGrid';
 import { Modal } from './Modal';
-import { Suggester } from '../utils/suggester';
 
-import { connectApi } from '../api/connectApi';
-
-export const MoveModal = connectApi(api => ({
-  locationSuggester: new Suggester(api, 'location'),
-}))(({ open, onClose, encounter, ...rest }) => {
+export const MoveModal = ({ open, onClose, encounter }) => {
+  const { navigateToEncounter } = usePatientNavigation();
+  const locationSuggester = useSuggester('location', {
+    baseQueryParameters: { filterByFacility: true },
+  });
   const { writeAndViewEncounter } = useEncounter();
   const movePatient = useCallback(
     async data => {
       await writeAndViewEncounter(encounter.id, data);
+      navigateToEncounter(encounter.id);
       onClose();
     },
-    [encounter, writeAndViewEncounter, onClose],
+    [encounter, writeAndViewEncounter, onClose, navigateToEncounter],
   );
 
   return (
     <Modal title="Move patient" open={open} onClose={onClose}>
-      <MoveForm onClose={onClose} onSubmit={movePatient} encounter={encounter} {...rest} />
+      <MoveForm
+        onClose={onClose}
+        onSubmit={movePatient}
+        encounter={encounter}
+        locationSuggester={locationSuggester}
+      />
     </Modal>
   );
-});
+};
 
 const MoveForm = ({ onSubmit, onClose, encounter, locationSuggester }) => {
   const renderForm = useCallback(
@@ -105,7 +112,7 @@ const MoveForm = ({ onSubmit, onClose, encounter, locationSuggester }) => {
 // );
 
 // const BaseMoveModal = connectApi((api, dispatch, { encounter, endpoint }) => ({
-//   locationSuggester: new Suggester(api, 'location'),
+//   locationSuggester: new Suggester(api, 'location'), // If this gets uncommented, check if the location should be filtered by current facility (SEE EPI-87)
 //   onSubmit: async data => {
 //     await api.put(`encounter/${encounter.id}/${endpoint}`, data);
 //     dispatch(viewEncounter(encounter.id));

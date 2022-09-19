@@ -78,7 +78,11 @@ export const simpleGetList = (modelName, foreignKey = '', options = {}) =>
   asyncHandler(async (req, res) => {
     const { models, params, query } = req;
     const { order = 'ASC', orderBy } = query;
-    const { additionalFilters = {}, include = [] } = options;
+    const { additionalFilters = {}, include = [], skipPermissionCheck = false } = options;
+
+    if (skipPermissionCheck === false) {
+      req.checkPermission('list', modelName);
+    }
 
     const model = models[modelName];
     const associations = model.getListReferenceAssociations(models) || [];
@@ -101,24 +105,29 @@ export const simpleGetList = (modelName, foreignKey = '', options = {}) =>
   });
 
 export const paginatedGetList = (modelName, foreignKey = '', options = {}) => {
-  const { additionalFilters = {}, include = [] } = options;
+  const { additionalFilters = {}, include = [], skipPermissionCheck = false } = options;
 
   return asyncHandler(async (req, res) => {
     const { models, params, query } = req;
     const { page = 0, order = 'ASC', orderBy, rowsPerPage } = query;
     const offset = query.offset || page * rowsPerPage || 0;
 
+    if (skipPermissionCheck === false) {
+      req.checkPermission('list', modelName);
+    }
+
     const model = models[modelName];
     const associations = model.getListReferenceAssociations(models) || [];
 
-    const filters = {
+    const queryOpts = {
       where: {
         ...(foreignKey && { [foreignKey]: params.id }),
         ...additionalFilters,
       },
+      include: [...associations, ...include],
     };
 
-    const resultsToCount = await models[modelName].findAll(filters);
+    const resultsToCount = await models[modelName].findAll(queryOpts);
     const count = resultsToCount.length;
     // Exit early if there are no results
     if (count === 0) {
@@ -127,11 +136,10 @@ export const paginatedGetList = (modelName, foreignKey = '', options = {}) => {
     }
 
     const objects = await models[modelName].findAll({
-      ...filters,
+      ...queryOpts,
       order: orderBy ? [[orderBy, order.toUpperCase()]] : undefined,
       limit: rowsPerPage || undefined,
       offset,
-      include: [...associations, ...include],
     });
 
     const data = objects.map(x => x.forResponse());
@@ -175,3 +183,10 @@ export async function runPaginatedQuery(db, model, countQuery, selectQuery, para
     data: forResponse,
   };
 }
+
+export const createNoteListingHandler = recordType =>
+  simpleGetList('Note', 'recordId', {
+    additionalFilters: { recordType },
+    // this is designed to be mounted inside a permission checking router
+    skipPermissionCheck: true,
+  });
