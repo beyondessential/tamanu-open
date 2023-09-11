@@ -1,6 +1,6 @@
 import React from 'react';
 import * as yup from 'yup';
-
+import { getCurrentDateTimeString } from 'shared/utils/dateTime';
 import { foreignKey } from '../utils/validation';
 import { diagnosisCertaintyOptions } from '../constants';
 
@@ -14,9 +14,10 @@ import {
   AutocompleteField,
   DateField,
 } from '../components/Field';
+import { useSuggester } from '../api';
 
 export const DiagnosisForm = React.memo(
-  ({ isTriage = false, onCancel, onSave, diagnosis, icd10Suggester }) => {
+  ({ isTriage = false, onCancel, onSave, diagnosis, excludeDiagnoses }) => {
     // don't show the "ED Diagnosis" option if we're just on a regular encounter
     // (unless we're editing a diagnosis with ED certainty already set)
     const certaintyOptions = diagnosisCertaintyOptions.filter(x => {
@@ -26,11 +27,15 @@ export const DiagnosisForm = React.memo(
     });
     const defaultCertainty = certaintyOptions[0].value;
 
+    const icd10Suggester = useSuggester('icd10', {
+      filterer: icd => !excludeDiagnoses.some(d => d.diagnosisId === icd.id),
+    });
+
     return (
       <Form
         onSubmit={onSave}
         initialValues={{
-          date: new Date(),
+          date: getCurrentDateTimeString(),
           isPrimary: true,
           certainty: defaultCertainty,
           ...diagnosis,
@@ -67,7 +72,7 @@ export const DiagnosisForm = React.memo(
               options={certaintyOptions}
               required
             />
-            <Field name="date" label="Date" component={DateField} required />
+            <Field name="date" label="Date" component={DateField} required saveDateAsString />
             <ConfirmCancelRow onConfirm={submitForm} onCancel={onCancel} />
           </FormGrid>
         )}

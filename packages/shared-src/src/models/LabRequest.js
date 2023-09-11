@@ -1,8 +1,9 @@
 import { Sequelize } from 'sequelize';
 import { InvalidOperationError } from 'shared/errors';
 
-import { LAB_REQUEST_STATUSES, NOTE_TYPES } from 'shared/constants';
+import { LAB_REQUEST_STATUSES, SYNC_DIRECTIONS } from 'shared/constants';
 import { Model } from './Model';
+import { buildEncounterLinkedSyncFilter } from './buildEncounterLinkedSyncFilter';
 import { dateTimeType } from './dateTimeTypes';
 import { getCurrentDateTimeString } from '../utils/dateTime';
 
@@ -31,6 +32,9 @@ export class LabRequest extends Model {
           type: Sequelize.STRING,
           defaultValue: LAB_REQUEST_STATUSES.RECEPTION_PENDING,
         },
+        reasonForCancellation: {
+          type: Sequelize.STRING,
+        },
         senaiteId: {
           type: Sequelize.STRING,
           allowNull: true,
@@ -43,8 +47,11 @@ export class LabRequest extends Model {
           type: Sequelize.STRING,
           allowNull: false,
         },
+        publishedDate: dateTimeType('publishedDate', {
+          allowNull: true,
+        }),
       },
-      options,
+      { syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL, ...options },
     );
   }
 
@@ -55,7 +62,9 @@ export class LabRequest extends Model {
         throw new InvalidOperationError('A request must have at least one test');
       }
 
-      const base = await this.create(data);
+      const { date, ...requestData } = data;
+
+      const base = await this.create(requestData);
 
       // then create tests
       const { LabTest } = this.sequelize.models;
@@ -65,18 +74,12 @@ export class LabRequest extends Model {
           LabTest.create({
             labTestTypeId: t,
             labRequestId: base.id,
+            date,
           }),
         ),
       );
 
       return base;
-    });
-  }
-
-  async addLabNote(content) {
-    await this.createNote({
-      noteType: NOTE_TYPES.OTHER,
-      content,
     });
   }
 
@@ -116,9 +119,9 @@ export class LabRequest extends Model {
       as: 'certificate_notification',
     });
 
-    this.hasMany(models.Note, {
+    this.hasMany(models.NotePage, {
       foreignKey: 'recordId',
-      as: 'notes',
+      as: 'notePages',
       constraints: false,
       scope: {
         recordType: this.name,
@@ -127,7 +130,23 @@ export class LabRequest extends Model {
   }
 
   static getListReferenceAssociations() {
-    return ['requestedBy', 'category', 'priority', 'laboratory'];
+    return [
+      'requestedBy',
+      'category',
+      'priority',
+      'laboratory',
+      { association: 'tests', include: ['labTestType'] },
+    ];
+  }
+
+  static buildSyncFilter(patientIds, sessionConfig) {
+    if (sessionConfig.syncAllLabRequests) {
+      return ''; // include all lab requests
+    }
+    if (patientIds.length === 0) {
+      return null;
+    }
+    return buildEncounterLinkedSyncFilter([this.tableName, 'encounters']);
   }
 
   getTests() {

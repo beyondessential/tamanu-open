@@ -1,6 +1,7 @@
 {
   "name": "meta-server",
-  "version": "1.20.0",
+  "version": "1.26.3",
+  "private": true,
   "description": "Meta server for Tamanu",
   "homepage": "https://github.com/beyondessential/tamanu.git#readme",
   "repository": "git@github.com:beyondessential/tamanu.git",
@@ -13,11 +14,9 @@
     "start": "node ./dist/app.bundle.js",
     "start-dev": "rm -rf ./dist/ && webpack --config webpack.config.dev.mjs",
     "test": "NODE_ENV=test jest --runInBand",
-    "test-coverage": "yarn test --coverage",
     "test-watch": "yarn test --watch",
     "build": "rm -rf ./dist/ && webpack --config webpack.config.prod.mjs",
-    "lint": "eslint app",
-    "lint-stats": "eslint app --format ../scripts/eslint-stats.js"
+    "lint": "eslint app"
   },
   "devDependencies": {
     "@babel/core": "^7.17.12",
@@ -26,21 +25,27 @@
     "@babel/plugin-proposal-logical-assignment-operators": "^7.17.12",
     "@babel/preset-env": "^7.17.12",
     "@beyondessential/eslint-config-js": "^1.1.0",
-    "babel-jest": "^28.1.1",
+    "babel-jest": "^29.3.1",
     "babel-loader": "^8.0.5",
     "chai": "^4.1.2",
     "eslint": "^5.15.2",
     "eslint-import-resolver-webpack": "^0.11.0",
     "eslint-plugin-import": "^2.22.1",
-    "jest": "^28.1.1",
+    "jest": "^29.3.1",
     "mocha": "^5.2.0",
     "pkg": "^4.4.8",
     "supertest": "^4.0.2",
+    "terser-webpack-plugin": "^5.3.6",
     "webpack": "^5.73.0",
     "webpack-cli": "^4.10.0",
     "webpack-node-externals": "^3.0.0"
   },
   "dependencies": {
+    "@honeycombio/opentelemetry-node": "^0.3.2",
+    "@opentelemetry/api": "^1.4.0",
+    "@opentelemetry/auto-instrumentations-node": "^0.36.0",
+    "@opentelemetry/resources": "^1.9.1",
+    "@opentelemetry/semantic-conventions": "^1.9.1",
     "abort-controller": "^3.0.0",
     "await-to-js": "^2.0.1",
     "body-parser": "^1.19.0",
@@ -65,6 +70,8 @@
     "request": "^2.88.0",
     "request-promise": "^4.2.2",
     "sanitize-html": "^2.4.0",
+    "sequelize": "^6.23.2",
+    "shortid": "^2.2.13",
     "winston": "^3.2.1"
   }
 }

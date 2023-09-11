@@ -1,7 +1,7 @@
 import { Op } from 'sequelize';
-import moment from 'moment';
+import { startOfDay, endOfDay, parseISO } from 'date-fns';
 import { DIAGNOSIS_CERTAINTY } from 'shared/constants';
-import { getAgeFromDate } from 'shared/utils/date';
+import { toDateTimeString, ageInYears, format } from 'shared/utils/dateTime';
 import { generateReportFromQueryData } from './utilities';
 
 const FIELD_TO_TITLE = {
@@ -18,6 +18,7 @@ const FIELD_TO_TITLE = {
   clinician: 'Clinician',
   dateOfAttendance: 'Date of attendance',
   department: 'Department',
+  locationGroup: 'Area',
   location: 'Location',
   reasonForAttendance: 'Reason for attendance',
   primaryDiagnosis: 'Primary diagnosis',
@@ -29,8 +30,15 @@ const reportColumnTemplate = Object.entries(FIELD_TO_TITLE).map(([key, title]) =
   accessor: data => data[key],
 }));
 
-const parametersToEncounterSqlWhere = parameters =>
-  Object.entries(parameters)
+const parametersToEncounterSqlWhere = parameters => {
+  const newParameters = { ...parameters };
+  if (parameters.fromDate) {
+    newParameters.fromDate = toDateTimeString(startOfDay(parseISO(parameters.fromDate)));
+  }
+  if (parameters.toDate) {
+    newParameters.toDate = toDateTimeString(endOfDay(parseISO(parameters.toDate)));
+  }
+  return Object.entries(newParameters)
     .filter(([, val]) => val)
     .reduce((where, [key, value]) => {
       const newWhere = { ...where };
@@ -45,19 +53,20 @@ const parametersToEncounterSqlWhere = parameters =>
           if (!newWhere.startDate) {
             newWhere.startDate = {};
           }
-          newWhere.startDate[Op.gte] = moment(value).startOf('day');
+          newWhere.startDate[Op.gte] = value;
           break;
         case 'toDate':
           if (!newWhere.startDate) {
             newWhere.startDate = {};
           }
-          newWhere.startDate[Op.lte] = moment(value).endOf('day');
+          newWhere.startDate[Op.lte] = value;
           break;
         default:
           break;
       }
       return newWhere;
     }, {});
+};
 
 const getEncounters = async (models, parameters) => {
   const encounters = await models.Encounter.findAll({
@@ -88,9 +97,13 @@ const getEncounters = async (models, parameters) => {
         },
         required: false,
       },
+      {
+        model: models.Location,
+        as: 'location',
+        include: ['locationGroup'],
+      },
       'examiner',
       'department',
-      'location',
     ],
     where: parametersToEncounterSqlWhere(parameters),
     order: [['startDate', 'ASC']],
@@ -139,7 +152,7 @@ const transformDataPoint = encounter => {
     firstName: patient.firstName,
     lastName: patient.lastName,
     displayId: patient.displayId,
-    age: getAgeFromDate(patient.dateOfBirth),
+    age: ageInYears(patient.dateOfBirth),
     sex: patient.sex,
     ethnicity: patientAdditionalData?.ethnicity?.name,
     contactPhone: patientAdditionalData?.primaryContactNumber,
@@ -147,8 +160,9 @@ const transformDataPoint = encounter => {
     medicalArea: patientAdditionalData?.medicalArea?.name,
     nursingZone: patientAdditionalData?.nursingZone?.name,
     clinician: examiner?.displayName,
-    dateOfAttendance: moment(encounter.startDate).format('DD-MM-YYYY'),
+    dateOfAttendance: format(encounter.startDate, 'dd-MM-yyyy'),
     department: encounter.department?.name,
+    locationGroup: encounter.location?.locationGroup?.name,
     location: encounter.location?.name,
     reasonForAttendance: encounter.reasonForEncounter,
     primaryDiagnosis: stringifyDiagnoses(primaryDiagnoses),

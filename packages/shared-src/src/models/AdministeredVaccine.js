@@ -1,8 +1,10 @@
 import { Sequelize, Op } from 'sequelize';
 import { InvalidOperationError } from 'shared/errors';
+import { SYNC_DIRECTIONS } from 'shared/constants';
 import { Model } from './Model';
 import { Encounter } from './Encounter';
 import { ScheduledVaccine } from './ScheduledVaccine';
+import { dateTimeType } from './dateTimeTypes';
 
 export class AdministeredVaccine extends Model {
   static init({ primaryKey, ...options }) {
@@ -11,6 +13,7 @@ export class AdministeredVaccine extends Model {
         id: primaryKey,
         batch: Sequelize.STRING,
         consent: Sequelize.BOOLEAN,
+        consentGivenBy: Sequelize.TEXT,
         status: {
           type: Sequelize.STRING,
           allowNull: false,
@@ -18,13 +21,16 @@ export class AdministeredVaccine extends Model {
         reason: Sequelize.STRING,
         injectionSite: Sequelize.STRING, // conceptually enum(INJECTION_SITE_OPTIONS)
         givenBy: Sequelize.TEXT,
-        date: {
-          type: Sequelize.DATE,
-          allowNull: false,
-        },
+        givenElsewhere: Sequelize.BOOLEAN,
+        vaccineBrand: Sequelize.TEXT,
+        vaccineName: Sequelize.TEXT,
+        disease: Sequelize.TEXT,
+        circumstanceIds: Sequelize.ARRAY(Sequelize.STRING),
+        date: dateTimeType('date'),
       },
       {
         ...options,
+        syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
         validate: {
           mustHaveScheduledVaccine() {
             if (!this.deletedAt && !this.scheduledVaccineId) {
@@ -72,6 +78,54 @@ export class AdministeredVaccine extends Model {
       foreignKey: 'departmentId',
       as: 'department',
     });
+
+    this.belongsTo(models.ReferenceData, {
+      foreignKey: 'notGivenReasonId',
+      as: 'notGivenReason',
+    });
+  }
+
+  static buildSyncFilter(patientIds, { syncAllEncountersForTheseVaccines }) {
+    const joins = [];
+    const wheres = [];
+
+    if (patientIds.length > 0) {
+      joins.push(`
+        LEFT JOIN encounters
+        ON administered_vaccines.encounter_id = encounters.id
+        AND encounters.patient_id IN (:patientIds)
+      `);
+      wheres.push(`
+        encounters.id IS NOT NULL
+      `);
+    }
+
+    // add any administered vaccines with a vaccine in the list of scheduled vaccines that sync everywhere
+    if (syncAllEncountersForTheseVaccines?.length > 0) {
+      const escapedVaccineIds = syncAllEncountersForTheseVaccines
+        .map(id => this.sequelize.escape(id))
+        .join(',');
+      joins.push(`
+        LEFT JOIN scheduled_vaccines
+        ON scheduled_vaccines.id = administered_vaccines.scheduled_vaccine_id
+        AND scheduled_vaccines.vaccine_id IN (${escapedVaccineIds})
+      `);
+      wheres.push(`
+        scheduled_vaccines.id IS NOT NULL
+      `);
+    }
+
+    if (wheres.length === 0) {
+      return null;
+    }
+
+    return `
+      ${joins.join('\n')}
+      WHERE (
+        ${wheres.join('\nOR')}
+      )
+      AND ${this.tableName}.updated_at_sync_tick > :since
+    `;
   }
 
   static async lastVaccinationForPatient(patientId, vaccineIds = []) {

@@ -1,9 +1,12 @@
 import { Sequelize } from 'sequelize';
 import { InvalidOperationError } from 'shared/errors';
-import { PROGRAM_DATA_ELEMENT_TYPES } from 'shared/constants';
+import { PROGRAM_DATA_ELEMENT_TYPES, SYNC_DIRECTIONS } from 'shared/constants';
 import { Model } from './Model';
+import { buildEncounterLinkedSyncFilter } from './buildEncounterLinkedSyncFilter';
 import { runCalculations } from '../utils/calculations';
 import { getStringValue, getResultValue } from '../utils/fields';
+import { dateTimeType } from './dateTimeTypes';
+import { getCurrentDateTimeString } from '../utils/dateTime';
 
 async function createPatientIssues(models, questions, patientId) {
   const issueQuestions = questions.filter(
@@ -56,7 +59,8 @@ async function writeToPatientFields(models, questions, answers, patientId) {
   // Save values to database records
   const { Patient, PatientAdditionalData } = models;
   if (Object.keys(patientRecordValues).length) {
-    await Patient.update(patientRecordValues, { where: { id: patientId } });
+    const patient = await Patient.findByPk(patientId);
+    await patient.update(patientRecordValues);
   }
   if (Object.keys(patientAdditionalDataValues).length) {
     const pad = await PatientAdditionalData.getOrCreateForPatient(patientId);
@@ -75,17 +79,23 @@ export class SurveyResponse extends Model {
     super.init(
       {
         id: primaryKey,
-
-        startTime: { type: Sequelize.DATE, allowNull: true },
-        endTime: { type: Sequelize.DATE, allowNull: true },
+        startTime: dateTimeType('startTime', { allowNull: true }),
+        endTime: dateTimeType('endTime', { allowNull: true }),
         result: { type: Sequelize.FLOAT, allowNull: true },
         resultText: { type: Sequelize.TEXT, allowNull: true },
       },
-      options,
+      {
+        syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
+        ...options,
+      },
     );
   }
 
   static initRelations(models) {
+    this.belongsTo(models.User, {
+      foreignKey: 'userId',
+      as: 'user',
+    });
     this.belongsTo(models.Survey, {
       foreignKey: 'surveyId',
       as: 'survey',
@@ -107,7 +117,18 @@ export class SurveyResponse extends Model {
     });
   }
 
+  static buildSyncFilter(patientIds) {
+    if (patientIds.length === 0) {
+      return null;
+    }
+    return buildEncounterLinkedSyncFilter([this.tableName, 'encounters']);
+  }
+
   static async getSurveyEncounter({ encounterId, patientId, reasonForEncounter, ...responseData }) {
+    if (!this.sequelize.isInsideTransaction()) {
+      throw new Error('SurveyResponse.getSurveyEncounter must always run inside a transaction!');
+    }
+
     const { Encounter } = this.sequelize.models;
 
     if (encounterId) {
@@ -132,18 +153,27 @@ export class SurveyResponse extends Model {
       return openEncounter;
     }
 
-    const { departmentId, examinerId, locationId } = responseData;
+    const { departmentId, userId, locationId } = responseData;
 
-    // need to create a new encounter
-    return Encounter.create({
+    // need to create a new encounter with examiner set as the user who submitted the survey.
+    const newEncounter = await Encounter.create({
       patientId,
       encounterType: 'surveyResponse',
       reasonForEncounter,
       departmentId,
-      examinerId,
+      examinerId: userId,
       locationId,
-      startDate: Date.now(),
-      endDate: Date.now(),
+      // Survey responses will usually have a startTime and endTime and we prefer to use that
+      // for the encounter to ensure the times are set in the browser timezone
+      startDate: responseData.startTime ? responseData.startTime : getCurrentDateTimeString(),
+    });
+
+    return newEncounter.update({
+      endDate: responseData.endTime ? responseData.endTime : getCurrentDateTimeString(),
+      systemNote: 'Automatically discharged',
+      discharge: {
+        note: 'Automatically discharged after survey completion',
+      },
     });
   }
 
@@ -203,6 +233,10 @@ export class SurveyResponse extends Model {
         throw new Error(`no data element for question: ${dataElementId}`);
       }
       const body = getStringValue(dataElement.type, value);
+      // Don't create null answers
+      if (body === null) {
+        continue;
+      }
       await models.SurveyResponseAnswer.create({
         dataElementId: dataElement.id,
         body,

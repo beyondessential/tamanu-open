@@ -1,23 +1,15 @@
 import React from 'react';
 import styled, { css } from 'styled-components';
-import { ENCOUNTER_TYPES } from 'shared/constants';
 import { Box, Typography } from '@material-ui/core';
 import { useQuery } from '@tanstack/react-query';
-import { Colors, ENCOUNTER_OPTIONS_BY_VALUE } from '../../../constants';
-import {
-  DateDisplay,
-  ViewButton,
-  DeathCertificateModal,
-  ButtonWithPermissionCheck,
-} from '../../../components';
+import { Colors, ENCOUNTER_OPTIONS_BY_VALUE, PATIENT_STATUS } from '../../../constants';
+import { DateDisplay, Button, ButtonWithPermissionCheck } from '../../../components';
+import { DeathCertificateModal } from '../../../components/PatientPrinting';
 import { useApi } from '../../../api';
-
-const PATIENT_STATUS = {
-  INPATIENT: 'inpatient',
-  OUTPATIENT: 'outpatient',
-  EMERGENCY: 'emergency',
-  DECEASED: 'deceased',
-};
+import { getFullLocationName } from '../../../utils/location';
+import { getPatientStatus } from '../../../utils/getPatientStatus';
+import { useLocalisation } from '../../../contexts/Localisation';
+import { usePatientCurrentEncounter } from '../../../api/queries';
 
 const PATIENT_STATUS_COLORS = {
   [PATIENT_STATUS.INPATIENT]: Colors.safe, // Green
@@ -25,15 +17,6 @@ const PATIENT_STATUS_COLORS = {
   [PATIENT_STATUS.EMERGENCY]: Colors.orange, // Orange
   [PATIENT_STATUS.DECEASED]: Colors.midText, // grey
   [undefined]: Colors.primary, // Blue
-};
-
-const ENCOUNTER_TYPE_TO_STATUS = {
-  [ENCOUNTER_TYPES.ADMISSION]: PATIENT_STATUS.INPATIENT,
-  [ENCOUNTER_TYPES.CLINIC]: PATIENT_STATUS.OUTPATIENT,
-  [ENCOUNTER_TYPES.IMAGING]: PATIENT_STATUS.OUTPATIENT,
-  [ENCOUNTER_TYPES.OBSERVATION]: PATIENT_STATUS.OUTPATIENT,
-  [ENCOUNTER_TYPES.EMERGENCY]: PATIENT_STATUS.EMERGENCY,
-  [ENCOUNTER_TYPES.TRIAGE]: PATIENT_STATUS.EMERGENCY,
 };
 
 const Border = css`
@@ -127,7 +110,7 @@ const DataStatusMessage = ({ message }) => (
 const PatientDeathSummary = React.memo(({ patient }) => {
   const api = useApi();
   const { data: deathData, error, isLoading } = useQuery(['patientDeathSummary', patient.id], () =>
-    api.get(`patient/${patient.id}/death`),
+    api.get(`patient/${patient.id}/death`, {}, { showUnknownErrorToast: false }),
   );
 
   if (isLoading) {
@@ -175,10 +158,9 @@ const PatientDeathSummary = React.memo(({ patient }) => {
 });
 
 export const PatientEncounterSummary = ({ patient, viewEncounter, openCheckin }) => {
-  const api = useApi();
-  const { data: encounter, error, isLoading } = useQuery(['currentEncounter', patient.id], () =>
-    api.get(`patient/${patient.id}/currentEncounter`),
-  );
+  const { getLocalisation } = useLocalisation();
+  const { data: encounter, error, isLoading } = usePatientCurrentEncounter(patient.id);
+  const referralSourcePath = 'fields.referralSourceId';
 
   if (patient.dateOfDeath) {
     return <PatientDeathSummary patient={patient} />;
@@ -205,39 +187,59 @@ export const PatientEncounterSummary = ({ patient, viewEncounter, openCheckin })
     );
   }
 
-  const { startDate, location, encounterType, reasonForEncounter, id, examiner } = encounter;
-  const patientStatus = ENCOUNTER_TYPE_TO_STATUS[encounterType];
+  const {
+    startDate,
+    location,
+    referralSource,
+    encounterType,
+    reasonForEncounter,
+    id,
+    examiner,
+  } = encounter;
+
+  const patientStatus = getPatientStatus(encounterType);
 
   return (
     <Container patientStatus={patientStatus}>
       <Header patientStatus={patientStatus}>
         <BoldTitle variant="h3">Type:</BoldTitle>
-        <Title variant="h3">{ENCOUNTER_OPTIONS_BY_VALUE[encounterType].label}</Title>
+        <Title variant="h3">
+          {ENCOUNTER_OPTIONS_BY_VALUE[encounterType].label}
+          {location?.facility?.name ? ` | ${location?.facility?.name}` : ''}
+        </Title>
         <div style={{ flexGrow: 1 }} />
-        <ViewButton onClick={() => viewEncounter(id)} size="small" />
+        <Button onClick={() => viewEncounter(id)} size="small">
+          View encounter
+        </Button>
       </Header>
       <Content>
         <ContentItem>
-          <ContentLabel>Current Admission:</ContentLabel>
+          <ContentLabel>Current admission:</ContentLabel>
           <ContentText>{patientStatus}</ContentText>
         </ContentItem>
         <ContentItem>
-          <ContentLabel>Supervising doctor/nurse:</ContentLabel>
+          <ContentLabel>Supervising clinician:</ContentLabel>
           <ContentText>{examiner?.displayName || '-'}</ContentText>
         </ContentItem>
         <ContentItem>
           <ContentLabel>Location:</ContentLabel>
-          <ContentText>{location?.name || '-'}</ContentText>
+          <ContentText>{getFullLocationName(location)}</ContentText>
         </ContentItem>
-        <ContentItem>
-          <ContentLabel>Reason for encounter:</ContentLabel>
-          <ContentText>{reasonForEncounter}</ContentText>
-        </ContentItem>
+        {!getLocalisation(`${referralSourcePath}.hidden`) && (
+          <ContentItem>
+            <ContentLabel>{getLocalisation(`${referralSourcePath}.shortLabel`)}:</ContentLabel>
+            <ContentText>{referralSource?.name || '-'}</ContentText>
+          </ContentItem>
+        )}
         <ContentItem>
           <ContentLabel>Arrival date:</ContentLabel>
           <ContentText>
             <DateDisplay date={startDate} />
           </ContentText>
+        </ContentItem>
+        <ContentItem>
+          <ContentLabel>Reason for encounter:</ContentLabel>
+          <ContentText>{reasonForEncounter}</ContentText>
         </ContentItem>
       </Content>
     </Container>

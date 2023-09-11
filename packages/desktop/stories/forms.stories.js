@@ -3,6 +3,7 @@ import React from 'react';
 import shortid from 'shortid';
 import { storiesOf } from '@storybook/react';
 import { action } from '@storybook/addon-actions';
+
 import {
   createDummyVisit,
   createDummyPatient,
@@ -13,22 +14,21 @@ import {
   LOCATIONS,
   USERS,
 } from 'shared/demoData';
+import { VACCINE_RECORDING_TYPES } from 'shared/constants';
+
 import { EncounterForm } from '../app/forms/EncounterForm';
 import { TriageForm } from '../app/forms/TriageForm';
-import { VitalsForm } from '../app/forms/VitalsForm';
 import { ProcedureForm } from '../app/forms/ProcedureForm';
 import { AllergyForm } from '../app/forms/AllergyForm';
-import { ImmunisationForm } from '../app/forms/ImmunisationForm';
+import { VaccineForm } from '../app/forms/VaccineForm';
 import { OngoingConditionForm } from '../app/forms/OngoingConditionForm';
 import { DischargeForm } from '../app/forms/DischargeForm';
 import { NewPatientForm } from '../app/forms/NewPatientForm';
 import { PatientDetailsForm } from '../app/forms/PatientDetailsForm';
 import { LabRequestForm } from '../app/forms/LabRequestForm';
-import { ReferralForm } from '../app/forms/ReferralForm';
 import { MedicationForm } from '../app/forms/MedicationForm';
 import { DeathForm } from '../app/forms/DeathForm';
 import { FamilyHistoryForm } from '../app/forms/FamilyHistoryForm';
-import { NoteForm } from '../app/forms/NoteForm';
 import { createDummySuggester, mapToSuggestions } from './utils';
 import { TestSelectorInput } from '../app/components/TestSelector';
 import { Modal } from '../app/components/Modal';
@@ -77,17 +77,14 @@ const getScheduledVaccines = () => {
   return [];
 };
 
-storiesOf('Forms', module).add('ImmunisationForm', () => (
-  <Modal title="Give vaccine" open>
-    <ImmunisationForm
+storiesOf('Forms', module).add('VaccineForm', () => (
+  <Modal title="Record vaccine" open>
+    <VaccineForm
       onSubmit={action('submit')}
       onCancel={action('cancel')}
       practitionerSuggester={practitionerSuggester}
-      icd10Suggester={icd10Suggester}
-      vaccineSuggester={icd10Suggester}
-      departmentSuggester={icd10Suggester}
       getScheduledVaccines={getScheduledVaccines}
-      locationSuggester={locationSuggester}
+      vaccineRecordingType={VACCINE_RECORDING_TYPES.GIVEN}
     />
   </Modal>
 ));
@@ -121,10 +118,6 @@ storiesOf('Forms/VisitForm', module)
       editedObject={createDummyVisit()}
     />
   ));
-
-storiesOf('Forms', module).add('NoteForm', () => (
-  <NoteForm onSubmit={action('submit')} practitionerSuggester={practitionerSuggester} />
-));
 
 storiesOf('Forms', module).add('TriageForm', () => (
   <TriageForm
@@ -171,15 +164,11 @@ storiesOf('Forms', module).add('DischargeForm', () => (
   />
 ));
 
-storiesOf('Forms', module).add('VitalsForm', () => (
-  <VitalsForm onSubmit={action('submit')} onCancel={action('cancel')} />
-));
-
 storiesOf('Forms', module).add('NewPatientForm', () => (
   <NewPatientForm
     onSubmit={action('submit')}
     onCancel={action('cancel')}
-    generateId={shortid.generate}
+    generateDisplayId={shortid.generate}
     facilitySuggester={facilitySuggester}
     patientSuggester={patientSuggester}
   />
@@ -189,7 +178,7 @@ storiesOf('Forms', module).add('PatientDetailsForm', () => (
   <PatientDetailsForm
     onSubmit={action('submit')}
     onCancel={action('cancel')}
-    generateId={shortid.generate}
+    generateDisplayId={shortid.generate}
     facilitySuggester={facilitySuggester}
     patientSuggester={patientSuggester}
   />
@@ -201,20 +190,22 @@ const testCategories = [
 ];
 
 const testTypes = [
-  { name: 'Grape', id: 'grape', category: { id: 'sweet' } },
-  { name: 'Vanilla', id: 'vanilla', category: { id: 'sweet' } },
-  { name: 'Chocolate', id: 'chocolate', category: { id: 'sweet' } },
-  { name: 'Boysenberry', id: 'boysenberry', category: { id: 'sweet' } },
-  { name: 'Strawberry', id: 'strawb', category: { id: 'sweet' } },
-  { name: 'Lemon', id: 'lemon', category: { id: 'sweet' } },
-  { name: 'Pepper', id: 'pepper', category: { id: 'savoury' } },
-  { name: 'Cabbage', id: 'cabbage', category: { id: 'savoury' } },
-  { name: 'Sprout', id: 'sprout', category: { id: 'savoury' } },
-  { name: 'Yeast', id: 'yeast', category: { id: 'savoury' } },
-  { name: 'Zucchini', id: 'zuc', category: { id: 'savoury' } },
-  { name: 'Egg', id: 'egg', category: { id: 'savoury' } },
-  { name: 'Chicken', id: 'chicken', category: { id: 'savoury' } },
-  { name: 'Leek', id: 'leek', category: { id: 'savoury' } },
+  { name: 'Grape', id: 'grape', labTestCategoryId: 'sweet' },
+  { name: 'Vanilla', id: 'vanilla', labTestCategoryId: 'sweet' },
+  { name: 'Chocolate', id: 'chocolate', labTestCategoryId: 'sweet' },
+  { name: 'Boysenberry', id: 'boysenberry', labTestCategoryId: 'sweet' },
+  { name: 'Strawberry', id: 'strawb', labTestCategoryId: 'sweet' },
+  { name: 'Lemon', id: 'lemon', labTestCategoryId: 'sweet' },
+  { name: 'Pepper', id: 'pepper', labTestCategoryId: 'savoury' },
+  { name: 'Cabbage', id: 'cabbage', labTestCategoryId: 'savoury' },
+  { name: 'Sprout', id: 'sprout', labTestCategoryId: 'savoury' },
+  { name: 'Yeast', id: 'yeast', labTestCategoryId: 'savoury' },
+  { name: 'Zucchini', id: 'zuc', labTestCategoryId: 'savoury' },
+  { name: 'Egg', id: 'egg', labTestCategoryId: 'savoury' },
+  { name: 'Chicken', id: 'chicken', labTestCategoryId: 'savoury' },
+  { name: 'Leek', id: 'leek', labTestCategoryId: 'savoury' },
+  { name: 'Chilli', id: 'chilli', labTestCategoryId: 'savoury' },
+  { name: 'Fennel', id: 'fennel', labTestCategoryId: 'savoury' },
 ];
 
 const StorybookableTestSelector = () => {
@@ -250,15 +241,6 @@ storiesOf('Forms', module).add('MedicationForm', () => (
   />
 ));
 
-storiesOf('Forms', module).add('ReferralForm', () => (
-  <ReferralForm
-    onSubmit={action('submit')}
-    onCancel={action('cancel')}
-    practitionerSuggester={practitionerSuggester}
-    icd10Suggester={icd10Suggester}
-  />
-));
-
 storiesOf('Forms/LabRequestForm', module)
   .add('LabRequestForm', () => (
     <LabRequestForm
@@ -273,7 +255,7 @@ storiesOf('Forms/LabRequestForm', module)
       }}
       testTypes={testTypes}
       testCategories={testCategories}
-      generateId={shortid.generate}
+      generateDisplayId={shortid.generate}
       practitionerSuggester={practitionerSuggester}
     />
   ))

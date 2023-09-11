@@ -1,4 +1,3 @@
-import { useSelector } from 'react-redux';
 import { createStatePreservingReducer } from '../utils/createStatePreservingReducer';
 
 // actions
@@ -51,6 +50,11 @@ export const versionIncompatible = message => async dispatch => {
 
 export const logout = () => ({
   type: LOGOUT,
+});
+
+export const idleTimeout = () => ({
+  type: LOGOUT_WITH_ERROR,
+  error: 'You have been logged out due to inactivity',
 });
 
 export const requestPasswordReset = (host, email) => async (dispatch, getState, { api }) => {

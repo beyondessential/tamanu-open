@@ -1,15 +1,34 @@
-import { random, sample } from 'lodash';
-import { v4 as uuidv4 } from 'uuid';
+import { random, sample, snakeCase } from 'lodash';
 import Chance from 'chance';
+import { DataTypes } from 'sequelize';
+import { inspect } from 'util';
+import { formatISO9075 } from 'date-fns';
+
 import {
   DIAGNOSIS_CERTAINTY_VALUES,
   ENCOUNTER_TYPE_VALUES,
   IMAGING_REQUEST_STATUS_TYPES,
+  NOTE_TYPE_VALUES,
   PROGRAM_DATA_ELEMENT_TYPE_VALUES,
   REFERENCE_TYPE_VALUES,
   VISIBILITY_STATUSES,
-} from 'shared/constants';
+  LAB_REQUEST_STATUSES,
+} from '../constants';
 import { toDateTimeString, toDateString } from '../utils/dateTime';
+import { fakeUUID } from '../utils/generateId';
+import {
+  FhirAddress,
+  FhirAnnotation,
+  FhirCodeableConcept,
+  FhirContactPoint,
+  FhirHumanName,
+  FhirIdentifier,
+  FhirPatientLink,
+  FhirReference,
+  FhirExtension,
+  FhirImmunizationPerformer,
+  FhirImmunizationProtocolApplied,
+} from '../services/fhirTypes';
 
 const chance = new Chance();
 
@@ -24,7 +43,7 @@ export function fakeStringFields(prefix, fields) {
 }
 
 export function fakeScheduledVaccine(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     weeksFromBirthDue: random(0, 1000),
     weeksFromLastVaccinationDue: null,
@@ -41,7 +60,7 @@ export function fakeScheduledVaccine(prefix = 'test-') {
 }
 
 export function fakeSurvey(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     programId: null,
     surveyType: 'programs',
@@ -51,7 +70,7 @@ export function fakeSurvey(prefix = 'test-') {
 }
 
 export function fakeSurveyScreenComponent(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     surveyId: null,
     dataElementId: null,
@@ -71,7 +90,7 @@ export function fakeSurveyScreenComponent(prefix = 'test-') {
 }
 
 export function fakeProgramDataElement(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     type: sample(PROGRAM_DATA_ELEMENT_TYPE_VALUES),
     ...fakeStringFields(`${prefix}programDataElement_${id}_`, [
@@ -86,7 +105,7 @@ export function fakeProgramDataElement(prefix = 'test-') {
 }
 
 export function fakeReferenceData(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     type: sample(REFERENCE_TYPE_VALUES),
     visibilityStatus: VISIBILITY_STATUSES.CURRENT,
@@ -95,53 +114,53 @@ export function fakeReferenceData(prefix = 'test-') {
 }
 
 export function fakeUser(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return fakeStringFields(`${prefix}user_${id}_`, ['id', 'email', 'displayName', 'role']);
 }
 
 export function fakeProgram(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return fakeStringFields(`${prefix}program_${id})_`, ['id', 'name', 'code']);
 }
 
 export function fakeAdministeredVaccine(prefix = 'test-', scheduledVaccineId) {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     encounterId: null,
     scheduledVaccineId,
-    date: new Date(random(0, Date.now())),
+    date: formatISO9075(new Date(random(0, Date.now()))),
     ...fakeStringFields(`${prefix}administeredVaccine_${id}_`, ['id', 'batch', 'status', 'reason']),
   };
 }
 
 export function fakeEncounter(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     deviceId: null,
     surveyResponses: [],
     administeredVaccines: [],
     encounterType: sample(ENCOUNTER_TYPE_VALUES),
-    startDate: new Date(random(0, Date.now())),
-    endDate: new Date(random(0, Date.now())),
+    startDate: formatISO9075(new Date(random(0, Date.now()))),
+    endDate: formatISO9075(new Date(random(0, Date.now()))),
     ...fakeStringFields(`${prefix}encounter_${id}_`, ['id', 'reasonForEncounter']),
   };
 }
 
 export function fakeSurveyResponse(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     answers: [],
     encounterId: null,
     surveyId: null,
-    startTime: new Date(random(0, Date.now())),
-    endTime: new Date(random(0, Date.now())),
+    startTime: fakeDateTimeString(),
+    endTime: fakeDateTimeString(),
     result: Math.random() * 100,
     ...fakeStringFields(`${prefix}surveyResponse_${id}_`, ['id']),
   };
 }
 
 export function fakeSurveyResponseAnswer(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     dataElementId: null,
     responseId: null,
@@ -150,10 +169,10 @@ export function fakeSurveyResponseAnswer(prefix = 'test-') {
 }
 
 export function fakeEncounterDiagnosis(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
     certainty: sample(DIAGNOSIS_CERTAINTY_VALUES),
-    date: new Date(random(0, Date.now())),
+    date: formatISO9075(new Date(random(0, Date.now()))),
     isPrimary: sample([true, false]),
     encounterId: null,
     diagnosisId: null,
@@ -162,10 +181,10 @@ export function fakeEncounterDiagnosis(prefix = 'test-') {
 }
 
 export function fakeEncounterMedication(prefix = 'test-') {
-  const id = uuidv4();
+  const id = fakeUUID();
   return {
-    date: new Date(random(0, Date.now())),
-    endDate: new Date(random(0, Date.now())),
+    date: formatISO9075(new Date(random(0, Date.now()))),
+    endDate: formatISO9075(new Date(random(0, Date.now()))),
     qtyMorning: random(0, 10),
     qtyLunch: random(0, 10),
     qtyEvening: random(0, 10),
@@ -180,39 +199,44 @@ export function fakeEncounterMedication(prefix = 'test-') {
   };
 }
 
-const fakeDate = () => new Date(random(0, Date.now()));
-const fakeString = (model, { fieldName }, id) => `${model.name}.${fieldName}.${id}`;
-const fakeDateTimeString = () => toDateTimeString(fakeDate());
-const fakeDateString = () => toDateString(fakeDate());
-const fakeInt = () => random(0, 10);
-const fakeFloat = () => Math.random() * 1000;
-const fakeBool = () => sample([true, false]);
+export const fakeDate = () => new Date(random(0, Date.now()));
+export const fakeString = (model, { fieldName }, id) => `${model.name}.${fieldName}.${id}`;
+export const fakeDateTimeString = () => toDateTimeString(fakeDate());
+export const fakeDateString = () => toDateString(fakeDate());
+export const fakeInt = () => random(0, 10);
+export const fakeFloat = () => Math.random() * 1000;
+export const fakeBool = () => sample([true, false]);
+
 const FIELD_HANDLERS = {
   'TIMESTAMP WITH TIME ZONE': fakeDate,
+  'TIMESTAMP WITHOUT TIME ZONE': fakeDate,
   DATETIME: fakeDate,
-  date_time_string: fakeDateTimeString, // custom type used for datetime string storage
-  date_string: fakeDateString, // custom type used for date string storage
+  TIMESTAMP: fakeDate,
+
+  // custom type used for datetime string storage
+  date_time_string: fakeDateTimeString,
+  DATETIMESTRING: fakeDateTimeString,
+  // custom type used for date string storage
+  date_string: fakeDateString,
+  DATESTRING: fakeDateString,
+
   'VARCHAR(19)': fakeDateString, // VARCHAR(19) are used for date string storage
   'VARCHAR(255)': fakeString,
-  'VARCHAR(31)': (...args) => fakeString(...args).slice(0, 31),
+
+  // fallback for all other varchar lengths
+  'VARCHAR(N)': (model, attrs, id, length) => fakeString(model, attrs, id).slice(0, length),
+
   TEXT: fakeString,
   INTEGER: fakeInt,
   FLOAT: fakeFloat,
+  DECIMAL: fakeFloat,
   'TINYINT(1)': fakeBool,
   BOOLEAN: fakeBool,
   ENUM: (model, { type }) => sample(type.values),
+  UUID: () => fakeUUID(),
 };
 
-const IGNORED_FIELDS = [
-  'createdAt',
-  'updatedAt',
-  'deletedAt',
-  'pushedAt',
-  'pulledAt',
-  'markedForPush',
-  'markedForSync',
-  'isPushing',
-];
+const IGNORED_FIELDS = ['createdAt', 'updatedAt', 'deletedAt', 'updatedAtSyncTick'];
 
 const MODEL_SPECIFIC_OVERRIDES = {
   Facility: () => ({
@@ -222,11 +246,23 @@ const MODEL_SPECIFIC_OVERRIDES = {
     cityTown: chance.city(),
     division: chance.province({ full: true }),
     type: chance.pickone(['hospital', 'clinic']),
-    visibilityStatus: VISIBILITY_STATUSES.CURRENT,
   }),
-  ImagingRequest: () => ({
-    status: chance.pickone(Object.values(IMAGING_REQUEST_STATUS_TYPES)),
-  }),
+  ImagingRequest: () => {
+    const status = chance.pickone(Object.values(IMAGING_REQUEST_STATUS_TYPES));
+    const isCancelled = status === IMAGING_REQUEST_STATUS_TYPES.CANCELLED;
+    return {
+      status,
+      reasonForCancellation: isCancelled ? chance.pickone(['duplicate', 'entered-in-error']) : null,
+    };
+  },
+  LabRequest: () => {
+    const status = chance.pickone(Object.values(LAB_REQUEST_STATUSES));
+    const isCancelled = status === LAB_REQUEST_STATUSES.CANCELLED;
+    return {
+      status,
+      reasonForCancellation: isCancelled ? chance.pickone(['duplicate', 'entered-in-error']) : null,
+    };
+  },
   Patient: () => {
     const sex = chance.pickone(['male', 'female', 'other']);
     let nameGender;
@@ -244,37 +280,50 @@ const MODEL_SPECIFIC_OVERRIDES = {
       email: chance.email(),
     };
   },
-  PatientAdditionalData: () => ({
-    placeOfBirth: chance.city(),
-    bloodType: chance.pickone(['O', 'A', 'B', 'AB']) + chance.pickone(['+', '-']),
-    primaryContactNumber: chance.phone(),
-    secondaryContactNumber: chance.phone(),
-    maritalStatus: chance.pickone([
-      'Single',
-      'Married',
-      'Widowed',
-      'Divorced',
-      'Separated',
-      'De Facto',
-    ]),
-    cityTown: chance.city(),
-    streetVillage: chance.street(),
-    educationalLevel: chance.pickone([
-      'None',
-      'Primary',
-      'High School',
-      'Bachelors',
-      'Masters',
-      'PhD.',
-    ]),
-    socialMedia: `@${chance.word()}`,
-    title: chance.prefix(),
-    birthCertificate: `BC${chance.natural({ min: 1000000, max: 9999999 })}`,
-    drivingLicense: `L${chance.natural({ min: 100000, max: 999999 })}`,
-    passport: chance.character() + chance.natural({ min: 10000000, max: 99999999 }).toString(),
-    emergencyContactName: chance.name(),
-    emergencyContactNumber: chance.phone(),
-  }),
+  PatientAdditionalData: ({ id, patientId }) => {
+    const commonId = id || patientId || fakeUUID();
+    return {
+      id: commonId,
+      patientId: commonId,
+      placeOfBirth: chance.city(),
+      bloodType: chance.pickone(['O', 'A', 'B', 'AB']) + chance.pickone(['+', '-']),
+      primaryContactNumber: chance.phone(),
+      secondaryContactNumber: chance.phone(),
+      maritalStatus: chance.pickone([
+        'Single',
+        'Married',
+        'Widowed',
+        'Divorced',
+        'Separated',
+        'De Facto',
+      ]),
+      cityTown: chance.city(),
+      streetVillage: chance.street(),
+      educationalLevel: chance.pickone([
+        'None',
+        'Primary',
+        'High School',
+        'Bachelors',
+        'Masters',
+        'PhD.',
+      ]),
+      socialMedia: `@${chance.word()}`,
+      title: chance.prefix(),
+      birthCertificate: `BC${chance.natural({ min: 1000000, max: 9999999 })}`,
+      drivingLicense: `L${chance.natural({ min: 100000, max: 999999 })}`,
+      passport: chance.character() + chance.natural({ min: 10000000, max: 99999999 }).toString(),
+      emergencyContactName: chance.name(),
+      emergencyContactNumber: chance.phone(),
+      updatedAtByField: {},
+    };
+  },
+  PatientFacility: ({ patientId = fakeUUID(), facilityId = fakeUUID() }) => {
+    return {
+      id: `${patientId};${facilityId}`,
+      patientId,
+      facilityId,
+    };
+  },
   PatientDeathData: () => {
     const options = ['yes', 'no', 'unknown', null];
     return {
@@ -289,38 +338,199 @@ const MODEL_SPECIFIC_OVERRIDES = {
     displayName: chance.name(),
     role: 'practitioner',
   }),
+  Role: () => ({
+    name: `${snakeCase(chance.profession())}_${chance.hash({ length: 8 })}`,
+  }),
   Survey: () => ({
     isSensitive: false,
   }),
   Encounter: () => ({
     encounterType: sample(ENCOUNTER_TYPE_VALUES),
   }),
+  NotePage: () => ({
+    // This is a hack because the type of NotePage.id is UUID, whereas tests might create ids of the form:
+    // NotePage.id.123e4567-e89b-12d3-a456-426614174000
+    // Setting id: undefined allows the model to create a default uuid and therefore avoid erroring
+    // It will be fixed properly as part of EPI-160
+    id: undefined,
+    noteType: chance.pickone(NOTE_TYPE_VALUES),
+  }),
+  NoteItem: () => ({
+    id: undefined,
+  }),
+  Location: () => ({
+    maxOccupancy: 1,
+  }),
+};
+
+const FHIR_MODELS_HANDLERS = {
+  FhirPatient: {
+    identifier: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirIdentifier.fake(...args)),
+    name: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirHumanName.fake(...args)),
+    telecom: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirContactPoint.fake(...args)),
+    address: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirAddress.fake(...args)),
+    link: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirPatientLink.fake(...args)),
+    extension: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirExtension.fake(...args)),
+  },
+  FhirServiceRequest: {
+    identifier: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirIdentifier.fake(...args)),
+    category: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirCodeableConcept.fake(...args)),
+    order_detail: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirCodeableConcept.fake(...args)),
+    location_code: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirCodeableConcept.fake(...args)),
+    code: (...args) => FhirCodeableConcept.fake(...args),
+    subject: (...args) => FhirReference.fake(...args),
+    requester: (...args) => FhirReference.fake(...args),
+  },
+  FhirDiagnosticReport: {
+    extension: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirExtension.fake(...args)),
+    identifier: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirIdentifier.fake(...args)),
+    code: (...args) => FhirCodeableConcept.fake(...args),
+    subject: (...args) => FhirReference.fake(...args),
+    performer: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirReference.fake(...args)),
+    result: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirReference.fake(...args)),
+  },
+  FhirImmunization: {
+    vaccine_code: (...args) => FhirCodeableConcept.fake(...args),
+    patient: (...args) => FhirReference.fake(...args),
+    encounter: (...args) => FhirReference.fake(...args),
+    site: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirCodeableConcept.fake(...args)),
+    performer: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirImmunizationPerformer.fake(...args)),
+    protocol_applied: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirImmunizationProtocolApplied.fake(...args)),
+  },
+  FhirImagingStudy: {
+    identifier: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirIdentifier.fake(...args)),
+    basedOn: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirReference.fake(...args)),
+    note: (...args) =>
+      Array(random(0, 3))
+        .fill(0)
+        .map(() => FhirAnnotation.fake(...args)),
+  },
 };
 
 export const fake = (model, passedOverrides = {}) => {
-  const id = uuidv4();
+  const id = fakeUUID();
   const record = {};
   const modelOverridesFn = MODEL_SPECIFIC_OVERRIDES[model.name];
-  const modelOverrides = modelOverridesFn ? modelOverridesFn() : {};
+  const modelOverrides = modelOverridesFn ? modelOverridesFn(passedOverrides) : {};
   const overrides = { ...modelOverrides, ...passedOverrides };
   const overrideFields = Object.keys(overrides);
 
-  for (const [name, attribute] of Object.entries(model.tableAttributes)) {
+  function fakeField(name, attribute) {
     const { type, fieldName } = attribute;
 
     if (overrideFields.includes(fieldName)) {
-      record[name] = overrides[fieldName];
-    } else if (attribute.references) {
-      // null out id fields
-      record[name] = null;
-    } else if (IGNORED_FIELDS.includes(fieldName)) {
-      // ignore metadata fields
-    } else if (FIELD_HANDLERS[type]) {
-      record[name] = FIELD_HANDLERS[type](model, attribute, id);
-    } else {
-      // if you hit this error, you probably need to add a new field handler or a model-specific override
-      throw new Error(`Could not fake field ${model.name}.${name} of type ${type}`);
+      return overrides[fieldName];
     }
+
+    if (attribute.references) {
+      // null out id fields
+      return null;
+    }
+
+    if (IGNORED_FIELDS.includes(fieldName)) {
+      // ignore metadata fields
+      return undefined;
+    }
+
+    if (fieldName === 'id') {
+      return fakeUUID();
+    }
+
+    if (fieldName === 'visibilityStatus') {
+      return VISIBILITY_STATUSES.CURRENT;
+    }
+
+    if (type instanceof DataTypes.ARRAY && type.type) {
+      return Array(random(0, 3))
+        .fill(0)
+        .map(() => fakeField(name, { ...attribute, type: type.type }));
+    }
+
+    if (FIELD_HANDLERS[type]) {
+      return FIELD_HANDLERS[type](model, attribute, id);
+    }
+
+    if (type.type && FIELD_HANDLERS[type.type]) {
+      return FIELD_HANDLERS[type.type](model, attribute, id);
+    }
+
+    if (type instanceof DataTypes.STRING && type.options.length) {
+      return FIELD_HANDLERS['VARCHAR(N)'](model, attribute, id, type.options.length);
+    }
+
+    if (type instanceof DataTypes.JSONB && FHIR_MODELS_HANDLERS[model.name][fieldName]) {
+      return FHIR_MODELS_HANDLERS[model.name][fieldName](model, attribute, id);
+    }
+
+    // if you hit this error, you probably need to add a new field handler or a model-specific override
+    throw new Error(
+      `Could not fake field ${model.name}.${name} of type ${type} / ${type.type} / ${inspect(
+        type,
+      )}`,
+    );
   }
+
+  for (const [name, attribute] of Object.entries(model.tableAttributes)) {
+    const fakeValue = fakeField(name, attribute);
+    if (fakeValue !== undefined) record[name] = fakeValue;
+  }
+
   return record;
 };

@@ -1,12 +1,18 @@
 import { Sequelize } from 'sequelize';
-import moment from 'moment';
-import config from 'config';
+import { endOfDay, isBefore, parseISO, startOfToday } from 'date-fns';
 
-import { ENCOUNTER_TYPES, ENCOUNTER_TYPE_VALUES, NOTE_TYPES } from 'shared/constants';
+import {
+  ENCOUNTER_TYPES,
+  ENCOUNTER_TYPE_VALUES,
+  NOTE_TYPES,
+  SYNC_DIRECTIONS,
+} from 'shared/constants';
 import { InvalidOperationError } from 'shared/errors';
+import { dateTimeType } from './dateTimeTypes';
 
-import { initSyncForModelNestedUnderPatient } from './sync';
 import { Model } from './Model';
+import { onSaveMarkPatientForSync } from './onSaveMarkPatientForSync';
+import { dischargeOutpatientEncounters } from '../utils/dischargeOutpatientEncounters';
 
 export class Encounter extends Model {
   static init({ primaryKey, hackToSkipEncounterValidation, ...options }) {
@@ -40,134 +46,40 @@ export class Encounter extends Model {
         },
       };
     }
-    const nestedSyncConfig = initSyncForModelNestedUnderPatient(this, 'encounter');
-    const syncConfig = {
-      includedRelations: [
-        'administeredVaccines',
-        'surveyResponses',
-        'surveyResponses.answers',
-        'diagnoses',
-        'medications',
-        'labRequests',
-        'labRequests.tests',
-        'labRequests.notes',
-        'imagingRequests',
-        'imagingRequests.notes',
-        'procedures',
-        'initiatedReferrals',
-        'completedReferrals',
-        'vitals',
-        'discharge',
-        'triages',
-        'triages.notes',
-        'invoice',
-        'invoice.invoiceLineItems',
-        'invoice.invoicePriceChangeItems',
-        'documents',
-        'notes',
-      ],
-      ...nestedSyncConfig,
-      channelRoutes: [
-        ...nestedSyncConfig.channelRoutes,
-        {
-          route: 'labRequest/all/encounter',
-          mustMatchRecord: false,
-          queryFromParams: () => ({
-            where: {},
-            include: [
-              {
-                association: 'labRequests',
-                required: true,
-                duplicating: false,
-                attributes: [],
-              },
-            ],
-          }),
-        },
-        {
-          route: 'scheduledVaccine/:scheduledVaccineId/encounter',
-          mustMatchRecord: false,
-          queryFromParams: ({ scheduledVaccineId }) => {
-            if (typeof scheduledVaccineId !== 'string') {
-              throw new Error(
-                `Encounter queryFromParams: expected scheduledVaccineId to be a string, got ${scheduledVaccineId}`,
-              );
-            }
-            return {
-              where: {},
-              include: {
-                association: 'administeredVaccines',
-                required: true,
-                duplicating: false,
-                attributes: [],
-                where: { scheduledVaccineId },
-              },
-            };
-          },
-        },
-      ],
-      getChannels: async patientId => {
-        // query patient channels and localisation in parallel
-        const [nestedChannels, localisation] = await Promise.all([
-          nestedSyncConfig.getChannels(patientId),
-          this.sequelize.models.UserLocalisationCache.getLocalisation({
-            include: {
-              association: 'user',
-              required: true,
-              where: {
-                email: config.sync.email,
-              },
-            },
-          }),
-        ]);
-
-        // patient channels
-        const channels = [...nestedChannels];
-
-        // lab requests
-        if (config.sync.syncAllLabRequests) {
-          channels.push('labRequest/all/encounter');
-        }
-
-        // scheduled vaccines
-        const scheduledVaccineIdsToSync =
-          localisation?.sync?.syncAllEncountersForTheseScheduledVaccines || [];
-        for (const scheduledVaccineId of scheduledVaccineIdsToSync) {
-          channels.push(`scheduledVaccine/${scheduledVaccineId}/encounter`);
-        }
-
-        return channels;
-      },
-    };
     super.init(
       {
         id: primaryKey,
         encounterType: Sequelize.STRING(31),
-        startDate: {
-          type: Sequelize.DATE,
+        startDate: dateTimeType('startDate', {
           allowNull: false,
-        },
-        endDate: Sequelize.DATE,
+        }),
+        endDate: dateTimeType('endDate'),
         reasonForEncounter: Sequelize.TEXT,
         deviceId: Sequelize.TEXT,
+        plannedLocationStartTime: dateTimeType('plannedLocationStartTime'),
       },
       {
         ...options,
         validate,
-        syncConfig,
+        syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
       },
     );
+    onSaveMarkPatientForSync(this);
   }
 
   static getFullReferenceAssociations() {
     return [
-      'vitals',
       'department',
       'examiner',
       {
         association: 'location',
-        include: ['facility'],
+        include: ['facility', 'locationGroup'],
       },
+      {
+        association: 'plannedLocation',
+        include: ['facility', 'locationGroup'],
+      },
+      'referralSource',
     ];
   }
 
@@ -195,6 +107,11 @@ export class Encounter extends Model {
     this.belongsTo(models.Location, {
       foreignKey: 'locationId',
       as: 'location',
+    });
+
+    this.belongsTo(models.Location, {
+      foreignKey: 'plannedLocationId',
+      as: 'plannedLocation',
     });
 
     this.belongsTo(models.Department, {
@@ -266,9 +183,14 @@ export class Encounter extends Model {
       as: 'patientBillingType',
     });
 
-    this.hasMany(models.Note, {
+    this.belongsTo(models.ReferenceData, {
+      foreignKey: 'referralSourceId',
+      as: 'referralSource',
+    });
+
+    this.hasMany(models.NotePage, {
       foreignKey: 'recordId',
-      as: 'notes',
+      as: 'notePages',
       constraints: false,
       scope: {
         recordType: this.name,
@@ -279,35 +201,123 @@ export class Encounter extends Model {
     // this.hasMany(models.Report);
   }
 
+  static buildSyncFilter(patientIds, sessionConfig) {
+    const { syncAllLabRequests, syncAllEncountersForTheseVaccines } = sessionConfig;
+    const joins = [];
+    const encountersToIncludeClauses = [];
+    const updatedAtSyncTickClauses = ['encounters.updated_at_sync_tick > :since'];
+
+    if (patientIds.length > 0) {
+      encountersToIncludeClauses.push('encounters.patient_id IN (:patientIds)');
+    }
+
+    // add any encounters with a lab request, if syncing all labs is turned on for facility server
+    if (syncAllLabRequests) {
+      joins.push(`
+        LEFT JOIN (
+          SELECT e.id, max(lr.updated_at_sync_tick) as lr_updated_at_sync_tick
+          FROM encounters e
+          INNER JOIN lab_requests lr ON lr.encounter_id = e.id
+          WHERE e.updated_at_sync_tick > :since
+          OR lr.updated_at_sync_tick > :since
+          GROUP BY e.id
+        ) AS encounters_with_labs ON encounters_with_labs.id = encounters.id
+      `);
+
+      encountersToIncludeClauses.push(`
+        encounters_with_labs.id IS NOT NULL
+      `);
+
+      updatedAtSyncTickClauses.push(`
+        encounters_with_labs.lr_updated_at_sync_tick > :since
+      `);
+    }
+
+    // for mobile, add any encounters with a vaccine in the list of scheduled vaccines that sync everywhere
+    if (syncAllEncountersForTheseVaccines?.length > 0) {
+      const escapedVaccineIds = syncAllEncountersForTheseVaccines
+        .map(id => this.sequelize.escape(id))
+        .join(',');
+      joins.push(`
+        LEFT JOIN (
+          SELECT e.id, MAX(av.updated_at_sync_tick) AS av_updated_at_sync_tick
+          FROM encounters e
+          INNER JOIN administered_vaccines av ON av.encounter_id = e.id
+          INNER JOIN scheduled_vaccines sv ON sv.id = av.scheduled_vaccine_id
+          WHERE
+            sv.vaccine_id IN (${escapedVaccineIds})
+          AND
+            (
+              e.updated_at_sync_tick > :since
+            OR
+              av.updated_at_sync_tick > :since
+            )
+          GROUP BY e.id
+        ) AS encounters_with_scheduled_vaccines
+        ON encounters_with_scheduled_vaccines.id = encounters.id
+      `);
+
+      encountersToIncludeClauses.push(`
+        encounters_with_scheduled_vaccines.id IS NOT NULL
+      `);
+
+      updatedAtSyncTickClauses.push(`
+        encounters_with_scheduled_vaccines.av_updated_at_sync_tick > :since
+      `);
+    }
+
+    if (encountersToIncludeClauses.length === 0) {
+      return null;
+    }
+
+    return `
+      ${joins.join('\n')}
+      WHERE (
+        ${encountersToIncludeClauses.join('\nOR')}
+      )
+      AND (
+        ${updatedAtSyncTickClauses.join('\nOR')}
+      )
+    `;
+  }
+
   static checkNeedsAutoDischarge({ encounterType, startDate, endDate }) {
     return (
       encounterType === ENCOUNTER_TYPES.CLINIC &&
-      moment(startDate).isBefore(new Date(), 'day') &&
+      isBefore(parseISO(startDate), startOfToday()) &&
       !endDate
     );
   }
 
   static getAutoDischargeEndDate({ startDate }) {
-    return moment(startDate)
-      .endOf('day')
-      .toDate();
+    return endOfDay(parseISO(startDate));
   }
 
-  static sanitizeForSyncServer(values) {
-    // if the encounter is for an outpatient and started before today, it should be closed
-    if (this.checkNeedsAutoDischarge(values)) {
-      return { ...values, endDate: this.getAutoDischargeEndDate(values) };
-    }
-    return values;
+  static async adjustDataPostSyncPush(recordIds) {
+    await dischargeOutpatientEncounters(this.sequelize.models, recordIds);
   }
 
-  async addSystemNote(content) {
-    const note = await this.createNote({
+  async addLocationChangeNote(contentPrefix, fromLocation, toLocation, submittedTime, user) {
+    const { Location } = this.sequelize.models;
+    await this.addSystemNote(
+      `${contentPrefix} from ${Location.formatFullLocationName(
+        fromLocation,
+      )} to ${Location.formatFullLocationName(toLocation)}`,
+      submittedTime,
+      user,
+    );
+  }
+
+  async addSystemNote(content, date, user) {
+    const notePage = await this.createNotePage({
       noteType: NOTE_TYPES.SYSTEM,
-      content,
+      date,
     });
-
-    return note;
+    await notePage.createNoteItem({
+      content,
+      date,
+      ...(user?.id && { authorId: user?.id }),
+    });
   }
 
   async getLinkedTriage() {
@@ -319,14 +329,24 @@ export class Encounter extends Model {
     });
   }
 
-  async onDischarge(endDate, note) {
-    await this.addSystemNote(note || `Discharged patient.`);
+  async onDischarge({ endDate, submittedTime, systemNote, discharge }, user) {
+    const { Discharge } = this.sequelize.models;
+    await Discharge.create({
+      ...discharge,
+      encounterId: this.id,
+    });
+
+    await this.addSystemNote(systemNote || 'Discharged patient.', submittedTime, user);
     await this.closeTriage(endDate);
   }
 
-  async onEncounterProgression(newEncounterType) {
-    await this.addSystemNote(`Changed type from ${this.encounterType} to ${newEncounterType}`);
-    await this.closeTriage(new Date());
+  async onEncounterProgression(newEncounterType, submittedTime, user) {
+    await this.addSystemNote(
+      `Changed type from ${this.encounterType} to ${newEncounterType}`,
+      submittedTime,
+      user,
+    );
+    await this.closeTriage(submittedTime);
   }
 
   async closeTriage(endDate) {
@@ -338,23 +358,29 @@ export class Encounter extends Model {
     }
   }
 
-  async dischargeWithDischarger(discharger, endDate) {
-    if (this.endDate) throw new Error(`Encounter ${this.id} already discharged`);
+  async updateClinician(data, user) {
+    const { User } = this.sequelize.models;
+    const oldClinician = await User.findOne({ where: { id: this.examinerId } });
+    const newClinician = await User.findOne({ where: { id: data.examinerId } });
 
-    const { Discharge } = this.sequelize.models;
-    await Discharge.create({
-      encounterId: this.id,
-      dischargerId: discharger.id,
-    });
-    await this.update({ endDate });
+    if (!newClinician) {
+      throw new InvalidOperationError('Invalid clinician specified');
+    }
+
+    await this.addSystemNote(
+      `Changed supervising clinician from ${oldClinician.displayName} to ${newClinician.displayName}`,
+      data.submittedTime,
+      user,
+    );
   }
 
-  async update(data) {
+  async update(data, user) {
     const { Department, Location } = this.sequelize.models;
 
     const updateEncounter = async () => {
+      const additionalChanges = {};
       if (data.endDate && !this.endDate) {
-        await this.onDischarge(data.endDate, data.dischargeNote);
+        await this.onDischarge(data, user);
       }
 
       if (data.patientId && data.patientId !== this.patientId) {
@@ -362,18 +388,78 @@ export class Encounter extends Model {
       }
 
       if (data.encounterType && data.encounterType !== this.encounterType) {
-        await this.onEncounterProgression(data.encounterType);
+        await this.onEncounterProgression(data.encounterType, data.submittedTime, user);
       }
 
       if (data.locationId && data.locationId !== this.locationId) {
-        const oldLocation = await Location.findOne({ where: { id: this.locationId } });
-        const newLocation = await Location.findOne({ where: { id: data.locationId } });
+        const oldLocation = await Location.findOne({
+          where: { id: this.locationId },
+          include: 'locationGroup',
+        });
+        const newLocation = await Location.findOne({
+          where: { id: data.locationId },
+          include: 'locationGroup',
+        });
         if (!newLocation) {
           throw new InvalidOperationError('Invalid location specified');
         }
-        await this.addSystemNote(
-          `Changed location from ${oldLocation.name} to ${newLocation.name}`,
+        await this.addLocationChangeNote(
+          'Changed location',
+          oldLocation,
+          newLocation,
+          data.submittedTime,
+          user,
         );
+
+        // When we move to a new location, clear the planned location move
+        additionalChanges.plannedLocationId = null;
+        additionalChanges.plannedLocationStartTime = null;
+      }
+
+      if (data.plannedLocationId === null) {
+        // The automatic timeout doesn't provide a submittedTime, prevents double noting a cancellation
+        if (this.plannedLocationId && data.submittedTime) {
+          const currentlyPlannedLocation = await Location.findOne({
+            where: { id: this.plannedLocationId },
+          });
+          await this.addSystemNote(
+            `Cancelled planned move to ${currentlyPlannedLocation.name}`,
+            data.submittedTime,
+            user,
+          );
+        }
+        additionalChanges.plannedLocationStartTime = null;
+      }
+
+      if (data.plannedLocationId && data.plannedLocationId !== this.plannedLocationId) {
+        if (data.plannedLocationId === this.locationId) {
+          throw new InvalidOperationError(
+            'Planned location cannot be the same as current location',
+          );
+        }
+
+        const currentLocation = await Location.findOne({
+          where: { id: this.locationId },
+          include: 'locationGroup',
+        });
+        const plannedLocation = await Location.findOne({
+          where: { id: data.plannedLocationId },
+          include: 'locationGroup',
+        });
+
+        if (!plannedLocation) {
+          throw new InvalidOperationError('Invalid location specified');
+        }
+
+        await this.addLocationChangeNote(
+          'Added a planned location change',
+          currentLocation,
+          plannedLocation,
+          data.submittedTime,
+          user,
+        );
+
+        additionalChanges.plannedLocationStartTime = data.submittedTime;
       }
 
       if (data.departmentId && data.departmentId !== this.departmentId) {
@@ -384,10 +470,17 @@ export class Encounter extends Model {
         }
         await this.addSystemNote(
           `Changed department from ${oldDepartment.name} to ${newDepartment.name}`,
+          data.submittedTime,
+          user,
         );
       }
 
-      return super.update(data);
+      if (data.examinerId && data.examinerId !== this.examinerId) {
+        await this.updateClinician(data, user);
+      }
+
+      const { submittedTime, ...encounterData } = data;
+      return super.update({ ...encounterData, ...additionalChanges }, user);
     };
 
     if (this.sequelize.isInsideTransaction()) {

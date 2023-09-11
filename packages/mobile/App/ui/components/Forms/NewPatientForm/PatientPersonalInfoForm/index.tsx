@@ -6,6 +6,7 @@ import { KeyboardAvoidingView, StyleSheet } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import * as Yup from 'yup';
 import { FullView } from '/styled/common';
+import { formatISO9075, parseISO } from 'date-fns';
 import { NameSection } from './NameSection';
 import { KeyInformationSection } from './KeyInformationSection';
 import { LocationDetailsSection } from './LocationDetailsSection';
@@ -47,7 +48,7 @@ const getInitialValues = (isEdit: boolean, patient): {} => {
     middleName,
     lastName,
     culturalName,
-    dateOfBirth: new Date(dateOfBirth),
+    dateOfBirth: parseISO(dateOfBirth),
     email,
     sex,
     villageId,
@@ -58,12 +59,13 @@ export const FormComponent = ({ selectedPatient, setSelectedPatient, isEdit }): 
   const navigation = useNavigation();
   const onCreateNewPatient = useCallback(async values => {
     // submit form to server for new patient
+    const { dateOfBirth, ...otherValues } = values;
     const newPatient = await Patient.createAndSaveOne({
-      ...values,
+      ...otherValues,
+      dateOfBirth: formatISO9075(dateOfBirth),
       displayId: generateId(),
-      markedForSync: true,
-      markedForUpload: true,
     });
+    await Patient.markForSync(newPatient.id);
 
     // Reload instance to get the complete village fields
     // (related fields won't display all info otherwise)
@@ -76,7 +78,11 @@ export const FormComponent = ({ selectedPatient, setSelectedPatient, isEdit }): 
     async values => {
       // Update patient values (helper function uses .save()
       // so it will mark the record for upload).
-      await Patient.updateValues(selectedPatient.id, values);
+      const { dateOfBirth, ...otherValues } = values;
+      await Patient.updateValues(selectedPatient.id, {
+        dateOfBirth: formatISO9075(dateOfBirth),
+        ...otherValues,
+      });
 
       // Loading the instance is necessary to get all of the fields
       // from the relations that were updated, not just their IDs.
@@ -84,6 +90,7 @@ export const FormComponent = ({ selectedPatient, setSelectedPatient, isEdit }): 
 
       // Mark patient for sync and update redux state
       await Patient.markForSync(editedPatient.id);
+
       setSelectedPatient(editedPatient);
 
       // Navigate back to patient details

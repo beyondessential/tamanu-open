@@ -1,7 +1,11 @@
-import { ENCOUNTER_TYPES } from 'shared/constants';
+import config from 'config';
 import { Sequelize, Op } from 'sequelize';
+
+import { ENCOUNTER_TYPES, SYNC_DIRECTIONS } from 'shared/constants';
 import { InvalidOperationError } from 'shared/errors';
+
 import { Model } from './Model';
+import { buildEncounterLinkedSyncFilter } from './buildEncounterLinkedSyncFilter';
 import { dateTimeType } from './dateTimeTypes';
 
 export class Triage extends Model {
@@ -14,13 +18,14 @@ export class Triage extends Model {
         closedTime: dateTimeType('closedTime'),
         score: Sequelize.TEXT,
       },
-      options,
+      { syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL, ...options },
     );
   }
 
   static initRelations(models) {
     this.belongsTo(models.Encounter, {
       foreignKey: 'encounterId',
+      as: 'encounter',
     });
 
     this.belongsTo(models.User, {
@@ -36,14 +41,26 @@ export class Triage extends Model {
       foreignKey: 'secondaryComplaintId',
     });
 
-    this.hasMany(models.Note, {
+    this.belongsTo(models.ReferenceData, {
+      foreignKey: 'arrivalModeId',
+      as: 'arrivalMode',
+    });
+
+    this.hasMany(models.NotePage, {
       foreignKey: 'recordId',
-      as: 'notes',
+      as: 'notePages',
       constraints: false,
       scope: {
         recordType: this.name,
       },
     });
+  }
+
+  static buildSyncFilter(patientIds) {
+    if (patientIds.length === 0) {
+      return null;
+    }
+    return buildEncounterLinkedSyncFilter([this.tableName, 'encounters']);
   }
 
   static async create(data) {
@@ -72,12 +89,18 @@ export class Triage extends Model {
       .join(' and ');
     const reasonForEncounter = `Presented at emergency department with ${reasonsText}`;
 
-    const department = await Department.findOne({ where: { name: 'Emergency' } });
+    const department = await Department.findOne({
+      where: { name: 'Emergency', facilityId: config.serverFacilityId },
+    });
+
+    if (!data.departmentId && !department) {
+      throw new Error('Cannot find Emergency department for current facility');
+    }
 
     return this.sequelize.transaction(async () => {
       const encounter = await Encounter.create({
         encounterType: ENCOUNTER_TYPES.TRIAGE,
-        startDate: data.triageTime || new Date(),
+        startDate: data.triageTime,
         reasonForEncounter,
         patientId: data.patientId,
         departmentId: data.departmentId || department.dataValues.id,

@@ -1,4 +1,5 @@
 import config from 'config';
+import { isEmpty } from 'lodash';
 import { buildAbility, buildAbilityForUser } from './buildAbility';
 import { Permission } from '../models';
 
@@ -20,6 +21,11 @@ let permissionCache = {};
 
 export function resetPermissionCache() {
   permissionCache = {};
+}
+
+// helper for testing
+export function isPermissionCacheEmpty() {
+  return isEmpty(permissionCache);
 }
 
 const commaSplit = s =>
@@ -47,8 +53,20 @@ export async function queryPermissionsForRoles(roleString) {
   return result.map(r => r.forResponse());
 }
 
+// these functions allow testing permissions in isolation
+// they should ONLY be used in tests
+let { useHardcodedPermissions } = config.auth;
+export function setHardcodedPermissionsUseForTestsOnly(val) {
+  useHardcodedPermissions = Boolean(val);
+  resetPermissionCache();
+}
+export function unsetUseHardcodedPermissionsUseForTestsOnly() {
+  useHardcodedPermissions = config.auth.useHardcodedPermissions;
+  resetPermissionCache();
+}
+
 export async function getPermissionsForRoles(roleString) {
-  if (config.auth.useHardcodedPermissions) {
+  if (useHardcodedPermissions) {
     return getHardcodedPermissions(roleString);
   }
 

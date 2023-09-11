@@ -2,8 +2,9 @@ import React, { useCallback, useState, useEffect } from 'react';
 import * as yup from 'yup';
 import Select from 'react-select';
 import styled from 'styled-components';
-import Checkbox from '@material-ui/core/Checkbox';
+import { format, getCurrentDateTimeString, toDateTimeString } from 'shared/utils/dateTime';
 import { range } from 'lodash';
+import { isFuture, parseISO, set } from 'date-fns';
 import { Colors } from '../constants';
 import { useApi } from '../api';
 
@@ -15,11 +16,13 @@ import {
   AutocompleteField,
   TextField,
   CheckField,
-  DateField,
   StyledTextField,
+  LocalisedField,
+  useLocalisedSchema,
+  CheckControl,
 } from '../components/Field';
 import { OuterLabelFieldWrapper } from '../components/Field/OuterLabelFieldWrapper';
-import { DateInput } from '../components/Field/DateField';
+import { DateTimeField, DateTimeInput } from '../components/Field/DateField';
 import { TextInput } from '../components/Field/TextField';
 import { FormGrid } from '../components/FormGrid';
 import { TableFormFields } from '../components/Table';
@@ -27,10 +30,32 @@ import { TableFormFields } from '../components/Table';
 import { ConfirmCancelRow } from '../components/ButtonRow';
 import { DiagnosisList } from '../components/DiagnosisList';
 import { useEncounter } from '../contexts/Encounter';
-import { useLocalisation } from '../contexts/Localisation';
 
 const MAX_REPEATS = 12;
 const REPEATS_OPTIONS = range(MAX_REPEATS + 1).map(value => ({ label: value, value }));
+
+const getDischargeInitialValues = (encounter, dischargeNotePages, medicationInitialValues) => {
+  const today = new Date();
+  const encounterStartDate = parseISO(encounter.startDate);
+  return {
+    endDate: isFuture(encounterStartDate)
+      ? // In the case of a future start_date we cannot default to current datetime as it falls outside of the min date.
+        toDateTimeString(
+          set(encounterStartDate, {
+            hours: today.getHours(),
+            minutes: today.getMinutes(),
+            seconds: today.getSeconds(),
+          }),
+        )
+      : getCurrentDateTimeString(),
+    discharge: {
+      note: dischargeNotePages.map(np => np.noteItems?.[0]?.content).join('\n'),
+    },
+    medications: medicationInitialValues,
+    // Used in creation of associated notes
+    submittedTime: getCurrentDateTimeString(),
+  };
+};
 
 /*
 Creates an object to add initialValues to Formik that matches
@@ -95,7 +120,7 @@ const NumberFieldWithoutLabel = ({ field, ...props }) => (
 const StyledFlexDiv = styled.div`
   display: flex;
 `;
-const StyledCheckbox = styled(Checkbox)`
+const StyledCheckbox = styled(CheckControl)`
   font-size: 16px;
 `;
 const StyledTextSpan = styled.span`
@@ -110,11 +135,8 @@ alongside the checkbox with different stylings.
 const CustomCheckField = ({ field, lineOne, lineTwo }) => (
   <StyledFlexDiv>
     <StyledCheckbox
-      icon={<i className="far fa-square" />}
-      checkedIcon={<i className="far fa-check-square" />}
       color="primary"
-      value="checked"
-      checked={field.value || false}
+      value={field.value}
       name={field.name}
       onChange={field.onChange}
     />
@@ -163,9 +185,9 @@ const EncounterOverview = ({
 
   return (
     <>
-      <DateInput label="Admission date" value={startDate} disabled />
+      <DateTimeInput label="Admission date" value={startDate} disabled />
       <TextInput
-        label="Supervising physician"
+        label="Supervising clinician"
         value={examiner ? examiner.displayName : '-'}
         disabled
       />
@@ -192,10 +214,9 @@ export const DischargeForm = ({
   onSubmit,
 }) => {
   const { encounter } = useEncounter();
-  const [dischargeNotes, setDischargeNotes] = useState([]);
+  const [dischargeNotePages, setDischargeNotePages] = useState([]);
   const api = useApi();
-  const { getLocalisation } = useLocalisation();
-  const dischargeDisposition = Boolean(getLocalisation('features.enableDischargeDisposition'));
+  const { getLocalisedSchema } = useLocalisedSchema();
 
   // Only display medications that are not discontinued
   // Might need to update condition to compare by end date (decision pending)
@@ -217,8 +238,8 @@ export const DischargeForm = ({
 
   useEffect(() => {
     (async () => {
-      const { data: notes } = await api.get(`encounter/${encounter.id}/notes`);
-      setDischargeNotes(notes.filter(n => n.noteType === 'discharge'));
+      const { data: notePages } = await api.get(`encounter/${encounter.id}/notePages`);
+      setDischargeNotePages(notePages.filter(n => n.noteType === 'discharge'));
     })();
   }, [api, encounter.id]);
 
@@ -226,7 +247,14 @@ export const DischargeForm = ({
     <>
       <FormGrid>
         <EncounterOverview encounter={encounter} />
-        <Field name="endDate" label="Discharge date" component={DateField} required />
+        <Field
+          name="endDate"
+          label="Discharge date"
+          component={DateTimeField}
+          min={format(encounter.startDate, "yyyy-MM-dd'T'HH:mm")}
+          required
+          saveDateAsString
+        />
         <Field
           name="discharge.dischargerId"
           label="Discharging physician"
@@ -234,12 +262,12 @@ export const DischargeForm = ({
           suggester={practitionerSuggester}
           required
         />
-        {dischargeDisposition && <Field
+        <LocalisedField
           name="discharge.dispositionId"
-          label="Discharge disposition"
+          path="fields.dischargeDisposition"
           component={AutocompleteField}
           suggester={dispositionSuggester}
-        />}
+        />
         <OuterLabelFieldWrapper label="Discharge medications" style={{ gridColumn: '1 / -1' }}>
           <TableFormFields columns={medicationColumns} data={activeMedications} />
         </OuterLabelFieldWrapper>
@@ -269,19 +297,22 @@ export const DischargeForm = ({
       onSubmit={handleSubmit}
       render={renderForm}
       enableReinitialize
-      initialValues={{
-        endDate: new Date(),
-        discharge: {
-          note: dischargeNotes.map(n => n.content).join('\n'),
-        },
-        medications: medicationInitialValues,
-      }}
+      initialValues={getDischargeInitialValues(
+        encounter,
+        dischargeNotePages,
+        medicationInitialValues,
+      )}
       validationSchema={yup.object().shape({
         endDate: yup.date().required(),
         discharge: yup
           .object()
           .shape({
             dischargerId: foreignKey('Discharging physician is a required field'),
+          })
+          .shape({
+            dispositionId: getLocalisedSchema({
+              name: 'dischargeDisposition',
+            }),
           })
           .required(),
       })}
