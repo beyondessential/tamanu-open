@@ -5,15 +5,19 @@ import styled from 'styled-components';
 import PrintIcon from '@material-ui/icons/Print';
 import Box from '@material-ui/core/Box';
 
+import { DIAGNOSIS_CERTAINTIES_TO_HIDE } from 'shared/constants';
+
 import { PrintPortal, PrintLetterhead } from '../../components/PatientPrinting';
 import { LocalisedText } from '../../components/LocalisedText';
-import { useApi } from '../../api';
+import { useApi, isErrorUnknownAllow404s } from '../../api';
 import { Button } from '../../components/Button';
 import { DateDisplay } from '../../components/DateDisplay';
 import { useEncounter } from '../../contexts/Encounter';
 import { useElectron } from '../../contexts/Electron';
 import { Colors } from '../../constants';
 import { useCertificate } from '../../utils/useCertificate';
+import { getFullLocationName } from '../../utils/location';
+import { useLocalisation } from '../../contexts/Localisation';
 
 const Container = styled.div`
   background: ${Colors.white};
@@ -71,25 +75,47 @@ const IdValue = styled.span`
 `;
 
 const DiagnosesList = ({ diagnoses }) => {
+  const { getLocalisation } = useLocalisation();
+
   if (diagnoses.length === 0) {
     return <span>N/A</span>;
   }
 
-  return diagnoses.map(item => (
-    <li>
-      {item.diagnosis.name} (<Label>ICD 10 Code: </Label> {item.diagnosis.code})
-    </li>
-  ));
+  const displayIcd10Codes = getLocalisation('features.displayIcd10CodesInDischargeSummary');
+
+  return diagnoses
+    .filter(({ certainty }) => !DIAGNOSIS_CERTAINTIES_TO_HIDE.includes(certainty))
+    .map(item => (
+      <li>
+        {item.diagnosis.name}
+        {displayIcd10Codes && (
+          <span>
+            {' '}
+            <Label>ICD 10 Code: </Label> {item.diagnosis.code}
+          </span>
+        )}
+      </li>
+    ));
 };
 
 const ProceduresList = ({ procedures }) => {
+  const { getLocalisation } = useLocalisation();
+
   if (!procedures || procedures.length === 0) {
     return <span>N/A</span>;
   }
 
+  const displayProcedureCodes = getLocalisation('features.displayProcedureCodesInDischargeSummary');
+
   return procedures.map(procedure => (
     <li>
-      {procedure.procedureType.name} (<Label>CPT Code: </Label> {procedure.procedureType.code})
+      {procedure.procedureType.name}
+      {displayProcedureCodes && (
+        <span>
+          {' '}
+          (<Label>CPT Code: </Label> {procedure.procedureType.code})
+        </span>
+      )}
     </li>
   ));
 };
@@ -115,8 +141,11 @@ const MedicationsList = ({ medications }) => {
 const SummaryPage = React.memo(({ encounter, discharge }) => {
   const { title, subTitle, logo } = useCertificate();
 
-  const patient = useSelector(state => state.patient);
+  const { getLocalisation } = useLocalisation();
+  const dischargeDispositionVisible =
+    getLocalisation('fields.dischargeDisposition.hidden') === false;
 
+  const patient = useSelector(state => state.patient);
   const {
     diagnoses,
     procedures,
@@ -154,26 +183,28 @@ const SummaryPage = React.memo(({ encounter, discharge }) => {
       <Content>
         <div>
           <Label>Admission date: </Label>
-          <DateDisplay date={startDate} />
+          <DateDisplay date={startDate} showTime />
         </div>
         <div>
           <Label>Discharge date: </Label>
-          <DateDisplay date={endDate} />
+          <DateDisplay date={endDate} showTime />
         </div>
         <div>
           <Label>Department: </Label>
-          {location && location.name}
+          {getFullLocationName(location)}
         </div>
-        {discharge && <div>
-          <Label>Discharge disposition: </Label>
-          {discharge.disposition?.name}
-        </div>}
+        {discharge && dischargeDispositionVisible && (
+          <div>
+            <Label>Discharge disposition: </Label>
+            {discharge.disposition?.name}
+          </div>
+        )}
         <div />
       </Content>
       <HorizontalLine />
       <Content>
         <div>
-          <Label>Supervising physician: </Label>
+          <Label>Supervising clinician: </Label>
           <span>{examiner?.displayName}</span>
         </div>
         <div />
@@ -205,15 +236,19 @@ const SummaryPage = React.memo(({ encounter, discharge }) => {
             <ProceduresList procedures={procedures} />
           </ul>
         </ListColumn>
-        <Label>Medications: </Label>
+        <Label>Discharge medications: </Label>
         <ListColumn>
           <ul>
-            <MedicationsList medications={medications} />
+            <MedicationsList
+              medications={medications.filter(
+                medication => !medication.discontinued && medication.isDischarge,
+              )}
+            />
           </ul>
         </ListColumn>
         <div>
           <Label>Discharge planning notes:</Label>
-          <div style={{ whiteSpace: 'pre-wrap' }}>{discharge?.note}</div>
+          <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{discharge?.note}</div>
         </div>
       </Content>
     </SummaryPageContainer>
@@ -229,7 +264,11 @@ export const DischargeSummaryView = React.memo(() => {
   useEffect(() => {
     (async () => {
       if (encounter?.id) {
-        const data = await api.get(`encounter/${encounter?.id}/discharge`);
+        const data = await api.get(
+          `encounter/${encounter?.id}/discharge`,
+          {},
+          { isErrorUnknown: isErrorUnknownAllow404s },
+        );
         setDischarge(data);
       }
     })();

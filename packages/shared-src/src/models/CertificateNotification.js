@@ -2,6 +2,8 @@ import { Sequelize } from 'sequelize';
 import { SYNC_DIRECTIONS } from 'shared/constants';
 import { Model } from './Model';
 
+import { dateType } from './dateTimeTypes';
+
 export class CertificateNotification extends Model {
   static init({ primaryKey, ...options }) {
     super.init(
@@ -13,13 +15,14 @@ export class CertificateNotification extends Model {
         requireSigning: Sequelize.BOOLEAN,
         status: Sequelize.STRING,
         error: Sequelize.TEXT,
+        printedDate: dateType('printedDate'),
       },
       {
         ...options,
 
         // Note that if this changes to bidirectional, the SendCertificateNotification task
         // will need to be updated / limited to handle only new publishes!
-        syncConfig: { syncDirection: SYNC_DIRECTIONS.PUSH_ONLY },
+        syncDirection: SYNC_DIRECTIONS.PUSH_TO_CENTRAL,
       },
     );
   }

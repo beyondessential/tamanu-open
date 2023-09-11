@@ -1,5 +1,8 @@
 import { Sequelize } from 'sequelize';
+import { SYNC_DIRECTIONS } from 'shared/constants';
 import { Model } from './Model';
+import { buildEncounterLinkedSyncFilter } from './buildEncounterLinkedSyncFilter';
+import { dateTimeType } from './dateTimeTypes';
 
 export class Procedure extends Model {
   static init({ primaryKey, ...options }) {
@@ -10,13 +13,13 @@ export class Procedure extends Model {
           type: Sequelize.BOOLEAN,
           defaultValue: false,
         },
-        date: { type: Sequelize.DATE, allowNull: false },
-        endTime: { type: Sequelize.DATE, allowNull: true },
-        startTime: { type: Sequelize.STRING, allowNull: true },
-        note: Sequelize.STRING,
-        completedNote: Sequelize.STRING,
+        date: dateTimeType('date', { allowNull: false }),
+        endTime: dateTimeType('endTime'),
+        startTime: dateTimeType('startTime'),
+        note: Sequelize.TEXT,
+        completedNote: Sequelize.TEXT,
       },
-      options,
+      { syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL, ...options },
     );
   }
 
@@ -27,6 +30,7 @@ export class Procedure extends Model {
   static initRelations(models) {
     this.belongsTo(models.Encounter, {
       foreignKey: 'encounterId',
+      as: 'encounter',
     });
     this.belongsTo(models.Location, {
       foreignKey: 'locationId',
@@ -52,5 +56,12 @@ export class Procedure extends Model {
       foreignKey: 'anaestheticId',
       as: 'Anaesthetic',
     });
+  }
+
+  static buildSyncFilter(patientIds) {
+    if (patientIds.length === 0) {
+      return null;
+    }
+    return buildEncounterLinkedSyncFilter([this.tableName, 'encounters']);
   }
 }

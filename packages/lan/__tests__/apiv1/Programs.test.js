@@ -122,25 +122,42 @@ describe('Programs', () => {
   });
   afterAll(() => ctx.close());
 
-  it('should list available programs', async () => {
-    const result = await app.get(`/v1/program`);
-    expect(result).toHaveSucceeded();
+  describe('Listing', () => {
+    it('should list available programs', async () => {
+      const result = await app.get(`/v1/program`);
+      expect(result).toHaveSucceeded();
 
-    const { body } = result;
-    expect(body.count).toEqual(body.data.length);
+      const { body } = result;
+      expect(body.count).toEqual(body.data.length);
 
-    expect(body.data.every(p => p.name));
-  });
+      expect(body.data.every(p => p.name));
+    });
 
-  it('should list surveys within a program', async () => {
-    const result = await app.get(`/v1/program/${testProgram.id}/surveys`);
-    expect(result).toHaveSucceeded();
+    it('should list surveys within a program', async () => {
+      const result = await app.get(`/v1/program/${testProgram.id}/surveys`);
+      expect(result).toHaveSucceeded();
 
-    expect(result.body.count).toEqual(4);
-    expect(result.body.data[0]).toHaveProperty('name', testSurvey.name);
-    expect(result.body.data[1]).toHaveProperty('name', testSurvey2.name);
-    expect(result.body.data[2]).toHaveProperty('name', testSurvey3.name);
-    expect(result.body.data[3]).toHaveProperty('name', testReferralSurvey.name);
+      expect(result.body.count).toEqual(4);
+      expect(result.body.data[0]).toHaveProperty('name', testSurvey.name);
+      expect(result.body.data[1]).toHaveProperty('name', testSurvey2.name);
+      expect(result.body.data[2]).toHaveProperty('name', testSurvey3.name);
+      expect(result.body.data[3]).toHaveProperty('name', testReferralSurvey.name);
+    });
+
+    it('should only suggest relevant surveys', async () => {
+      const [obsolete, vitals, relevant] = await models.Survey.bulkCreate([
+        { programId: testProgram.id, surveyType: SURVEY_TYPES.OBSOLETE, name: 'obsolete' },
+        { programId: testProgram.id, surveyType: SURVEY_TYPES.VITALS, name: 'vitals' },
+        { programId: testProgram.id, surveyType: SURVEY_TYPES.PROGRAM, name: 'relevant' },
+      ]);
+
+      const result = await app.get('/v1/suggestions/survey');
+      expect(result).toHaveSucceeded();
+      const resultIds = result.body.map(x => x.id);
+      expect(resultIds.includes(obsolete.id)).toEqual(false);
+      expect(resultIds.includes(vitals.id)).toEqual(false);
+      expect(resultIds.includes(relevant.id)).toEqual(true);
+    });
   });
 
   it('should fetch a survey', async () => {
@@ -225,7 +242,7 @@ describe('Programs', () => {
         testSurvey,
         {
           patientId: patient.id,
-          examinerId,
+          userId: examinerId,
           departmentId,
           locationId,
         },
@@ -238,7 +255,7 @@ describe('Programs', () => {
         testSurvey,
         {
           patientId: otherTestPatient.id,
-          examinerId,
+          userId: examinerId,
           departmentId,
           locationId,
         },
@@ -257,7 +274,7 @@ describe('Programs', () => {
 
         // expect encounter details to be included
         expect(response).toHaveProperty('programName');
-        expect(response).toHaveProperty('assessorName');
+        expect(response).toHaveProperty('submittedBy');
         expect(response).toHaveProperty('encounterId');
       };
 
@@ -303,7 +320,7 @@ describe('Programs', () => {
       const result = await app.post(`/v1/surveyResponse`).send({
         ...createDummySurveyResponse(testSurvey),
         patientId: testPatient.id,
-        examinerId,
+        userId: examinerId,
         departmentId,
         locationId,
       });
@@ -329,7 +346,7 @@ describe('Programs', () => {
         const patient = await models.Patient.create(await createDummyPatient(models));
         patientId = patient.id;
 
-        const commonParams = { patientId, examinerId, departmentId, locationId };
+        const commonParams = { patientId, userId: examinerId, departmentId, locationId };
 
         // populate responses
         await submitMultipleSurveyResponses(testReferralSurvey, commonParams);
@@ -384,11 +401,11 @@ describe('Programs', () => {
           config: {
             issueType: 'issue',
             issueNote: 'test-note',
-          }
+          },
         });
 
-        const beforeIssue = await models.PatientIssue.findOne({ 
-          where: { patientId: testPatient.id, note: 'test-note' } 
+        const beforeIssue = await models.PatientIssue.findOne({
+          where: { patientId: testPatient.id, note: 'test-note' },
         });
         expect(beforeIssue).toBeFalsy();
 
@@ -400,8 +417,8 @@ describe('Programs', () => {
         });
         expect(result).toHaveSucceeded();
 
-        const afterIssue = await models.PatientIssue.findAll({ 
-          where: { patientId: testPatient.id, note: 'test-note' }, 
+        const afterIssue = await models.PatientIssue.findAll({
+          where: { patientId: testPatient.id, note: 'test-note' },
         });
         expect(afterIssue).toBeTruthy();
       });
@@ -413,8 +430,8 @@ describe('Programs', () => {
             writeToPatient: {
               fieldName: 'email',
               isAdditionalDataField: false,
-            }
-          }
+            },
+          },
         });
 
         const TEST_EMAIL = 'updated-email@tamanu.io';
@@ -432,7 +449,6 @@ describe('Programs', () => {
         expect(testPatient.email).toEqual(TEST_EMAIL);
       });
 
-
       it('should write data to an existing patientAdditionalData record', async () => {
         const { pdeId, surveyId } = await createWithQuestion({
           type: PROGRAM_DATA_ELEMENT_TYPES.PATIENT_DATA,
@@ -440,8 +456,8 @@ describe('Programs', () => {
             writeToPatient: {
               fieldName: 'passport',
               isAdditionalDataField: true,
-            }
-          }
+            },
+          },
         });
 
         const TEST_PASSPORT = '123123';
@@ -467,8 +483,8 @@ describe('Programs', () => {
             writeToPatient: {
               fieldName: 'passport',
               isAdditionalDataField: true,
-            }
-          }
+            },
+          },
         });
 
         const freshPatient = await models.Patient.create(await createDummyPatient(models));
@@ -500,7 +516,7 @@ describe('Programs', () => {
       const result = await app.post(`/v1/surveyResponse`).send({
         ...createDummySurveyResponse(testSurvey),
         patientId: testPatient.id,
-        examinerId,
+        userId: examinerId,
         locationId,
       });
       expect(result).toHaveRequestError();
@@ -515,7 +531,7 @@ describe('Programs', () => {
       const result = await app.post(`/v1/surveyResponse`).send({
         ...createDummySurveyResponse(testSurvey),
         patientId: testPatient.id,
-        examinerId,
+        userId: examinerId,
         locationId,
       });
       expect(result).toHaveRequestError();

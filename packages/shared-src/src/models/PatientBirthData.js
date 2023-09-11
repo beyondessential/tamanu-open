@@ -1,8 +1,11 @@
 import Sequelize from 'sequelize';
-import { SYNC_DIRECTIONS } from 'shared/constants';
 import { InvalidOperationError } from 'shared/errors';
+import { SYNC_DIRECTIONS } from 'shared/constants';
+import { dateTimeType } from './dateTimeTypes';
 
 import { Model } from './Model';
+import { buildPatientLinkedSyncFilter } from './buildPatientLinkedSyncFilter';
+import { onSaveMarkPatientForSync } from './onSaveMarkPatientForSync';
 
 export class PatientBirthData extends Model {
   static init({ primaryKey, ...options }) {
@@ -18,13 +21,13 @@ export class PatientBirthData extends Model {
         apgarScoreOneMinute: { type: Sequelize.INTEGER },
         apgarScoreFiveMinutes: { type: Sequelize.INTEGER },
         apgarScoreTenMinutes: { type: Sequelize.INTEGER },
-        timeOfBirth: { type: Sequelize.STRING },
+        timeOfBirth: dateTimeType('timeOfBirth'),
         birthType: { type: Sequelize.STRING }, // Single/Plural
         registeredBirthPlace: { type: Sequelize.STRING },
       },
       {
         ...options,
-        syncConfig: { syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL },
+        syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
         tableName: 'patient_birth_data',
         validate: {
           mustHavePatient() {
@@ -38,6 +41,7 @@ export class PatientBirthData extends Model {
         },
       },
     );
+    onSaveMarkPatientForSync(this);
   }
 
   static initRelations(models) {
@@ -67,4 +71,6 @@ export class PatientBirthData extends Model {
     'birthFacilityId',
     'registeredBirthPlace',
   ];
+
+  static buildSyncFilter = buildPatientLinkedSyncFilter;
 }

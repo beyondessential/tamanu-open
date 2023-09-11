@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import Collapse from '@material-ui/core/Collapse';
-import MuiButton from '@material-ui/core/Button';
 import * as yup from 'yup';
 import styled from 'styled-components';
 import { FormGrid } from '../components/FormGrid';
@@ -36,6 +35,10 @@ const AdvancedButtonSpan = styled.span`
   }
 `;
 
+const ErrorMessage = styled.div`
+  text-align: center;
+`;
+
 export const LoginForm = React.memo(
   ({ onSubmit, errorMessage, rememberEmail, onNavToResetPassword }) => {
     const [isAdvancedExpanded, setAdvancedExpanded] = useState(false);
@@ -46,9 +49,9 @@ export const LoginForm = React.memo(
       }
     };
 
-    const renderForm = ({ setFieldValue }) => (
+    const renderForm = ({ setFieldValue, isSubmitting }) => (
       <FormGrid columns={1}>
-        <div>{errorMessage}</div>
+        <ErrorMessage>{errorMessage}</ErrorMessage>
         <Field name="email" type="email" label="Email" required component={TextField} />
         <Field name="password" label="Password" type="password" required component={TextField} />
         <RememberMeAdvancedRow>
@@ -74,7 +77,9 @@ export const LoginForm = React.memo(
             setFieldValue={setFieldValue}
           />
         </Collapse>
-        <LoginButton type="submit">Login to your account</LoginButton>
+        <LoginButton type="submit" isSubmitting={isSubmitting}>
+          Login to your account
+        </LoginButton>
         <Button onClick={onNavToResetPassword} color="default" variant="text">
           Forgot your password?
         </Button>

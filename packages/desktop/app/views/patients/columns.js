@@ -1,8 +1,8 @@
 import React from 'react';
 import { CloudDownload, CloudOff } from '@material-ui/icons';
-
 import { DateDisplay } from '../../components';
 import { capitaliseFirstLetter } from '../../utils/capitalise';
+import { getPatientStatus } from '../../utils/getPatientStatus';
 
 const DateCell = React.memo(({ value }) => <DateDisplay date={value} />);
 const SexCell = React.memo(({ value = '' }) => <span>{capitaliseFirstLetter(value)}</span>);
@@ -12,6 +12,7 @@ export const markedForSync = {
   key: 'markedForSync',
   minWidth: 26,
   CellComponent: SyncedCell,
+  sortable: false,
 };
 
 export const displayId = {
@@ -39,6 +40,7 @@ export const sex = {
   key: 'sex',
   minWidth: 80,
   CellComponent: SexCell,
+  sortable: false,
 };
 
 export const dateOfBirth = {
@@ -59,12 +61,6 @@ export const village = {
   accessor: row => row?.villageName || null,
 };
 
-export const location = {
-  key: 'locationName',
-  title: 'Location',
-  minWidth: 100,
-};
-
 export const department = {
   key: 'departmentName',
   title: 'Department',
@@ -74,11 +70,16 @@ export const department = {
 export const status = {
   key: 'patientStatus',
   title: 'Status',
+  sortable: false,
   minWidth: 100,
-  accessor: ({ patientStatus }) => {
-    const stat = capitaliseFirstLetter(patientStatus ?? '');
-    return stat === 'Deceased' ? <strong>{stat}</strong> : stat;
-  },
+  accessor: ({ dateOfDeath: dod, encounterType }) =>
+    dod ? <strong>Deceased</strong> : getPatientStatus(encounterType),
+};
+
+export const clinician = {
+  key: 'clinician',
+  title: 'Clinician',
+  sortable: false,
 };
 
 export const vaccinationStatus = {

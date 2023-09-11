@@ -1,6 +1,10 @@
 import { Sequelize } from 'sequelize';
-import { initSyncForModelNestedUnderPatient } from './sync';
+import { SYNC_DIRECTIONS } from 'shared/constants';
 import { Model } from './Model';
+import { buildPatientLinkedSyncFilter } from './buildPatientLinkedSyncFilter';
+import { dateTimeType } from './dateTimeTypes';
+import { getCurrentDateTimeString } from '../utils/dateTime';
+import { onSaveMarkPatientForSync } from './onSaveMarkPatientForSync';
 
 export class PatientFamilyHistory extends Model {
   static init({ primaryKey, ...options }) {
@@ -8,14 +12,18 @@ export class PatientFamilyHistory extends Model {
       {
         id: primaryKey,
         note: Sequelize.STRING,
-        recordedDate: { type: Sequelize.DATE, defaultValue: Sequelize.NOW, allowNull: false },
+        recordedDate: dateTimeType('recordedDate', {
+          defaultValue: getCurrentDateTimeString,
+          allowNull: false,
+        }),
         relationship: Sequelize.STRING,
       },
       {
         ...options,
-        syncConfig: initSyncForModelNestedUnderPatient(this, 'familyHistory'),
+        syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
       },
     );
+    onSaveMarkPatientForSync(this);
   }
 
   static initRelations(models) {
@@ -27,4 +35,6 @@ export class PatientFamilyHistory extends Model {
   static getListReferenceAssociations() {
     return ['diagnosis'];
   }
+
+  static buildSyncFilter = buildPatientLinkedSyncFilter;
 }

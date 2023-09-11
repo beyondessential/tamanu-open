@@ -1,8 +1,10 @@
-import { Sequelize } from 'sequelize';
-import config from 'config';
+import { Sequelize, Op } from 'sequelize';
 import { SYNC_DIRECTIONS, LAB_REQUEST_STATUSES } from 'shared/constants';
-import { dateTimeType } from './dateTimeTypes';
+import { getCovidClearanceCertificateFilter, getLabTestsFromLabRequests } from 'shared/utils';
 import { Model } from './Model';
+import { dateType, dateTimeType } from './dateTimeTypes';
+import { onSaveMarkPatientForSync } from './onSaveMarkPatientForSync';
+import { VACCINE_STATUS } from '../constants';
 
 export class Patient extends Model {
   static init({ primaryKey, ...options }) {
@@ -19,26 +21,19 @@ export class Patient extends Model {
         lastName: Sequelize.STRING,
         culturalName: Sequelize.STRING,
 
-        dateOfBirth: Sequelize.DATE,
+        dateOfBirth: dateType('dateOfBirth'),
         dateOfDeath: dateTimeType('dateOfDeath'),
+
         sex: {
           type: Sequelize.ENUM('male', 'female', 'other'),
           allowNull: false,
         },
         email: Sequelize.STRING,
-        markedForSync: {
-          type: Sequelize.BOOLEAN,
-          allowNull: false,
-          defaultValue: false,
-        },
         visibilityStatus: Sequelize.STRING,
       },
       {
         ...options,
-        syncConfig: {
-          syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
-          includedRelations: config.sync?.embedPatientNotes ? ['notes'] : [],
-        },
+        syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
         indexes: [
           { fields: ['date_of_death'] },
           { fields: ['display_id'] },
@@ -46,6 +41,7 @@ export class Patient extends Model {
         ],
       },
     );
+    onSaveMarkPatientForSync(this, 'id', 'afterSave');
   }
 
   static initRelations(models) {
@@ -82,30 +78,35 @@ export class Patient extends Model {
       as: 'mergedPatients',
     });
 
-    this.hasMany(models.Note, {
+    this.hasMany(models.NotePage, {
       foreignKey: 'recordId',
-      as: 'notes',
+      as: 'notePages',
       constraints: false,
       scope: {
         recordType: this.name,
       },
     });
+
+    this.belongsToMany(models.Facility, {
+      through: 'PatientFacility',
+      as: 'markedForSyncFacilities',
+    });
+
+    this.hasMany(models.PatientFieldValue, {
+      foreignKey: 'patientId',
+      as: 'fieldValues',
+    });
   }
 
-  static async getSyncIds() {
-    const patients = await this.sequelize.models.Patient.findAll({
-      where: { markedForSync: true },
-      raw: true,
-      attributes: ['id'],
-    });
-    return patients.map(({ id }) => id);
+  static getFullReferenceAssociations() {
+    return ['markedForSyncFacilities'];
   }
 
   async getAdministeredVaccines(queryOptions = {}) {
     const { models } = this.sequelize;
     const certifiableVaccineIds = await models.CertifiableVaccine.allVaccineIds();
 
-    const { where: optWhere = {}, include = [], ...optRest } = queryOptions;
+    const { where: optWhere = {}, include = [], includeNotGiven = true, ...optRest } = queryOptions;
 
     if (include.length === 0) {
       include.push(
@@ -117,6 +118,19 @@ export class Patient extends Model {
         {
           model: models.Location,
           as: 'location',
+          include: ['locationGroup', 'facility'],
+        },
+        {
+          model: models.Department,
+          as: 'department',
+        },
+        {
+          model: models.User,
+          as: 'recorder',
+        },
+        {
+          model: models.ReferenceData,
+          as: 'notGivenReason',
         },
       );
     }
@@ -129,18 +143,20 @@ export class Patient extends Model {
       });
     }
 
-    const results = await models.AdministeredVaccine.findAll({
+    const { count, rows } = await models.AdministeredVaccine.findAndCountAll({
       order: [['date', 'DESC']],
       ...optRest,
       include,
       where: {
-        ...optWhere,
         '$encounter.patient_id$': this.id,
-        status: 'GIVEN',
+        status: JSON.parse(includeNotGiven)
+          ? { [Op.in]: [VACCINE_STATUS.GIVEN, VACCINE_STATUS.NOT_GIVEN] }
+          : VACCINE_STATUS.GIVEN,
+        ...optWhere,
       },
     });
 
-    const data = results.map(x => x.get({ plain: true }));
+    const data = rows.map(x => x.get({ plain: true }));
 
     for (const record of data) {
       if (certifiableVaccineIds.includes(record.scheduledVaccine.vaccineId)) {
@@ -148,7 +164,24 @@ export class Patient extends Model {
       }
     }
 
-    return data;
+    return { count, data };
+  }
+
+  async getCovidClearanceLabTests(queryOptions) {
+    const labRequests = await this.sequelize.models.LabRequest.findAll({
+      raw: true,
+      nest: true,
+      ...queryOptions,
+      where: await getCovidClearanceCertificateFilter(this.sequelize.models),
+      include: [
+        {
+          association: 'category',
+        },
+        ...this.getLabTestBaseIncludes(),
+      ],
+    });
+
+    return getLabTestsFromLabRequests(labRequests);
   }
 
   async getCovidLabTests(queryOptions) {
@@ -158,37 +191,92 @@ export class Patient extends Model {
       ...queryOptions,
       where: { status: LAB_REQUEST_STATUSES.PUBLISHED },
       include: [
-        { association: 'requestedBy' },
         {
           association: 'category',
           where: { name: Sequelize.literal("UPPER(category.name) LIKE ('%COVID%')") },
         },
-        {
-          association: 'tests',
-          include: [{ association: 'labTestMethod' }, { association: 'labTestType' }],
-        },
-        { association: 'laboratory' },
-        {
-          association: 'encounter',
-          required: true,
-          include: [
-            { association: 'examiner' },
-            {
-              association: 'patient',
-              where: { id: this.id },
-            },
-          ],
-        },
+        ...this.getLabTestBaseIncludes(),
       ],
     });
 
-    // Place the tests data at the top level of the object as this is a getter for lab tests
-    // After the merge, id is the lab test id and labRequestId is the lab request id
-    const labTests = labRequests.map(labRequest => {
-      const { tests, ...labRequestData } = labRequest;
-      return { ...labRequestData, ...tests };
-    });
+    return getLabTestsFromLabRequests(labRequests);
+  }
 
-    return labTests.slice().sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+  getLabTestBaseIncludes() {
+    return [
+      { association: 'requestedBy' },
+      {
+        association: 'tests',
+        include: [{ association: 'labTestMethod' }, { association: 'labTestType' }],
+      },
+      { association: 'laboratory' },
+      {
+        association: 'encounter',
+        required: true,
+        include: [
+          { association: 'examiner' },
+          {
+            association: 'patient',
+            where: { id: this.id },
+          },
+        ],
+      },
+    ];
+  }
+
+  /** Patient this one was merged into (end of the chain) */
+  async getUltimateMergedInto() {
+    return this.constructor.findOne({
+      where: {
+        [Op.and]: [
+          { id: Sequelize.fn('any', Sequelize.fn('patients_merge_chain_up', this.id)) },
+          { id: { [Op.ne]: this.id } },
+          { mergedIntoId: null },
+        ],
+      },
+    });
+  }
+
+  /** Patients this one was merged into */
+  async getMergedUp() {
+    return this.constructor.findAll({
+      where: {
+        [Op.and]: [
+          { id: Sequelize.fn('any', Sequelize.fn('patients_merge_chain_up', this.id)) },
+          { id: { [Op.ne]: this.id } },
+        ],
+      },
+    });
+  }
+
+  /** Patients that were merged into this one */
+  async getMergedDown() {
+    return this.constructor.findAll({
+      where: {
+        [Op.and]: [
+          { id: Sequelize.fn('any', Sequelize.fn('patients_merge_chain_down', this.id)) },
+          { id: { [Op.ne]: this.id } },
+        ],
+      },
+    });
+  }
+
+  async writeFieldValues(patientFields = {}) {
+    const { PatientFieldValue } = this.constructor.sequelize.models;
+    for (const [definitionId, value] of Object.entries(patientFields)) {
+      // race condition doesn't matter because we take the last value anyway
+      const field = await PatientFieldValue.findOne({
+        where: {
+          definitionId,
+          patientId: this.id,
+        },
+        order: [['updatedAt', 'DESC']],
+      });
+      if (field) {
+        await field.update({ value });
+      } else {
+        await PatientFieldValue.create({ value, definitionId, patientId: this.id });
+      }
+    }
   }
 }

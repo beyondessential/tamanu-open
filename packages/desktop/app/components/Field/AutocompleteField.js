@@ -1,13 +1,16 @@
 import React, { Component } from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import PropTypes from 'prop-types';
 import Autosuggest from 'react-autosuggest';
 import { debounce } from 'lodash';
-import { MenuItem, Popper, Paper, Typography, InputAdornment } from '@material-ui/core';
-import Search from '@material-ui/icons/Search';
+import { MenuItem, Popper, Paper, Typography, InputAdornment, IconButton } from '@material-ui/core';
+
+import { ChevronIcon } from '../Icons/ChevronIcon';
+import { ClearIcon } from '../Icons/ClearIcon';
 import { OuterLabelFieldWrapper } from './OuterLabelFieldWrapper';
 import { Colors } from '../../constants';
 import { StyledTextField } from './TextField';
+import { Tag } from '../Tag';
 
 const SuggestionsContainer = styled(Popper)`
   z-index: 9999;
@@ -20,13 +23,15 @@ const SuggestionsContainer = styled(Popper)`
   .react-autosuggest__suggestions-container {
     max-height: 210px;
     overflow-y: auto;
+    border-color: ${Colors.primary};
   }
 `;
 
 const SuggestionsList = styled(Paper)`
+  margin-top: 1px;
   box-shadow: none;
   border: 1px solid ${Colors.outline};
-  border-radius: 0 0 3px 3px;
+  border-radius: 3px;
 
   .react-autosuggest__suggestions-list {
     margin: 0;
@@ -35,11 +40,12 @@ const SuggestionsList = styled(Paper)`
 
     .MuiButtonBase-root {
       padding: 12px 12px 12px 20px;
+      padding: ${props => (props.size === 'small' ? '8px 12px 8px 20px' : '12px 12px 12px 20px')};
       white-space: normal;
 
       .MuiTypography-root {
-        font-size: 14px;
-        line-height: 18px;
+        font-size: ${props => (props.size === 'small' ? '11px' : '14px')};
+        line-height: 1.3em;
       }
 
       &:hover {
@@ -50,26 +56,65 @@ const SuggestionsList = styled(Paper)`
 `;
 
 const Icon = styled(InputAdornment)`
+  margin-left: 0;
   .MuiSvgIcon-root {
-    color: ${props => props.theme.palette.text.secondary};
-    font-size: 20px;
+    color: ${Colors.darkText};
   }
+`;
+
+const OptionTag = styled(Tag)`
+  position: relative;
+`;
+
+const SelectTag = styled(Tag)`
+  position: relative;
+  margin-right: 3px;
+`;
+
+const Item = styled(MenuItem)`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+`;
+
+const iconStyle = css`
+  color: ${Colors.darkText};
+  margin-left: 6px;
+  margin-right: 8px;
+`;
+
+const StyledExpandLess = styled(ChevronIcon)`
+  ${iconStyle}
+  transform: rotate(180deg);
+`;
+
+const StyledExpandMore = styled(ChevronIcon)`
+  ${iconStyle}
+`;
+
+const StyledIconButton = styled(IconButton)`
+  padding: 5px;
+`;
+
+const StyledClearIcon = styled(ClearIcon)`
+  cursor: pointer;
 `;
 
 class BaseAutocomplete extends Component {
   constructor() {
     super();
     this.anchorEl = React.createRef();
-    this.debouncedFetchOptions = debounce(this.fetchOptions, 100);
+    this.debouncedFetchOptions = debounce(this.fetchOptions, 200);
 
     this.state = {
       suggestions: [],
-      displayedValue: '',
+      selectedOption: { value: '', tag: null },
     };
   }
 
   async componentDidMount() {
-    await this.updateValue();
+    const { allowFreeTextForExistingValue } = this.props;
+    await this.updateValue(allowFreeTextForExistingValue);
   }
 
   async componentDidUpdate(prevProps) {
@@ -77,20 +122,37 @@ class BaseAutocomplete extends Component {
     if (value !== prevProps.value) {
       await this.updateValue();
     }
+    if (value === '') {
+      await this.attemptAutoFill();
+    }
   }
 
-  updateValue = async () => {
+  updateValue = async (allowFreeTextForExistingValue = false) => {
     const { value, suggester } = this.props;
+
     if (!suggester || value === undefined) {
       return;
     }
     if (value === '') {
-      this.setState({ displayedValue: '' });
+      this.setState({ selectedOption: { value: '', tag: null } });
+      this.attemptAutoFill();
       return;
     }
-    const currentOption = await suggester.fetchCurrentOption(value);
-    if (currentOption) {
-      this.setState({ displayedValue: currentOption.label });
+
+    if (!allowFreeTextForExistingValue) {
+      const currentOption = await suggester.fetchCurrentOption(value);
+
+      if (currentOption) {
+        this.setState({
+          selectedOption: {
+            value: currentOption.label,
+            tag: currentOption.tag,
+          },
+        });
+      }
+    } else if (allowFreeTextForExistingValue && value) {
+      this.setState({ selectedOption: { value, tag: null } });
+      this.handleSuggestionChange({ value, label: value });
     } else {
       this.handleSuggestionChange({ value: null, label: '' });
     }
@@ -98,20 +160,64 @@ class BaseAutocomplete extends Component {
 
   handleSuggestionChange = option => {
     const { onChange, name } = this.props;
-    const { value } = option;
+    const { value, label } = option;
 
     onChange({ target: { value, name } });
-    return value;
+    return label;
   };
 
-  fetchOptions = async ({ value }) => {
-    const { suggester, options } = this.props;
+  fetchAllOptions = async (suggester, options) =>
+    suggester ? suggester.fetchSuggestions('') : options;
 
-    const suggestions = suggester
+  fetchOptions = async ({ value, reason }) => {
+    const { suggester, options, value: formValue } = this.props;
+
+    if (reason === 'suggestion-selected') {
+      this.clearOptions();
+      return;
+    }
+
+    const searchSuggestions = suggester
       ? await suggester.fetchSuggestions(value)
       : options.filter(x => x.label.toLowerCase().includes(value.toLowerCase()));
 
-    this.setState({ suggestions });
+    if (value === '') {
+      if (await this.attemptAutoFill({ suggestions: searchSuggestions })) return;
+    }
+
+    // presence of formValue means the user has selected an option for this field
+    const fieldClickedWithOptionSelected = reason === 'input-focused' && !!formValue;
+
+    // This will show the full suggestions list (or at least the first page) if the user
+    // has either just clicked the input or if the input does not match a value from list
+    this.setState({
+      suggestions: fieldClickedWithOptionSelected
+        ? await this.fetchAllOptions(suggester, options)
+        : searchSuggestions,
+    });
+  };
+
+  attemptAutoFill = async (overrides = { suggestions: null }) => {
+    const { suggester, options, autofill, name } = this.props;
+    if (!autofill) {
+      return false;
+    }
+    const suggestions =
+      overrides.suggestions || suggester
+        ? await suggester.fetchSuggestions('')
+        : options.filter(x => x.label.toLowerCase().includes(''));
+    if (suggestions.length !== 1) {
+      return false;
+    }
+    const autoSelectOption = suggestions[0];
+    this.setState({
+      selectedOption: {
+        value: autoSelectOption.label,
+        tag: autoSelectOption.tag,
+      },
+    });
+    this.handleSuggestionChange({ value: autoSelectOption.value, name });
+    return true;
   };
 
   handleInputChange = (event, { newValue }) => {
@@ -121,13 +227,19 @@ class BaseAutocomplete extends Component {
     }
     if (typeof newValue !== 'undefined') {
       this.setState(prevState => {
-        const newSuggestion = prevState.suggestions.find(suggest => suggest.value === newValue);
+        const newSuggestion = prevState.suggestions.find(suggest => suggest.label === newValue);
         if (!newSuggestion) {
-          return { displayedValue: newValue };
+          return { selectedOption: { value: newValue, tag: null } };
         }
-        return { displayedValue: newSuggestion.label };
+        return { selectedOption: { value: newSuggestion.label, tag: newSuggestion.tag } };
       });
     }
+  };
+
+  handleClearValue = () => {
+    const { onChange, name } = this.props;
+    onChange({ target: { value: undefined, name } });
+    this.setState({ selectedOption: { value: '', tag: null } });
   };
 
   clearOptions = () => {
@@ -141,41 +253,92 @@ class BaseAutocomplete extends Component {
     }
   };
 
-  renderSuggestion = (suggestion, { isHighlighted }) => (
-    <MenuItem selected={isHighlighted} component="div">
-      <Typography variant="body2">{suggestion.label}</Typography>
-    </MenuItem>
-  );
+  renderSuggestion = (suggestion, { isHighlighted }) => {
+    const { tag } = suggestion;
+    return (
+      <Item selected={isHighlighted} component="div">
+        <Typography variant="body2">{suggestion.label}</Typography>
+        {tag && (
+          <OptionTag $background={tag.background} $color={tag.color}>
+            {tag.label}
+          </OptionTag>
+        )}
+      </Item>
+    );
+  };
 
-  renderContainer = option => (
-    <SuggestionsContainer
-      anchorEl={this.anchorEl}
-      open={!!option.children}
-      placement="bottom-start"
-    >
-      <SuggestionsList {...option.containerProps}>{option.children}</SuggestionsList>
-    </SuggestionsContainer>
-  );
+  renderContainer = option => {
+    const { size = 'medium' } = this.props;
+    return (
+      <SuggestionsContainer
+        anchorEl={this.anchorEl}
+        open={!!option.children}
+        placement="bottom-start"
+      >
+        <SuggestionsList {...option.containerProps} size={size}>
+          {option.children}
+        </SuggestionsList>
+      </SuggestionsContainer>
+    );
+  };
 
   setAnchorRefForPopper = ref => {
     this.anchorEl = ref;
   };
 
   renderInputComponent = inputProps => {
-    const { label, required, className, ...other } = inputProps;
+    const {
+      label,
+      required,
+      className,
+      infoTooltip,
+      tag,
+      value,
+      size,
+      disabled,
+      ...other
+    } = inputProps;
+    const { suggestions } = this.state;
     return (
-      <OuterLabelFieldWrapper label={label} required={required} className={className}>
+      <OuterLabelFieldWrapper
+        label={label}
+        required={required}
+        className={className}
+        infoTooltip={infoTooltip}
+        size={size}
+      >
         <StyledTextField
           variant="outlined"
+          size={size}
           InputProps={{
             ref: this.setAnchorRefForPopper,
             endAdornment: (
-              <Icon position="end">
-                <Search />
-              </Icon>
+              <>
+                {tag && (
+                  <SelectTag $background={tag.background} $color={tag.color}>
+                    {tag.label}
+                  </SelectTag>
+                )}
+                {value && !disabled && (
+                  <StyledIconButton onClick={this.handleClearValue}>
+                    <StyledClearIcon />
+                  </StyledIconButton>
+                )}
+                <Icon
+                  position="end"
+                  onClick={event => {
+                    event.preventDefault();
+                    this.anchorEl.click();
+                  }}
+                >
+                  {suggestions.length > 0 ? <StyledExpandLess /> : <StyledExpandMore />}
+                </Icon>
+              </>
             ),
           }}
           fullWidth
+          value={value}
+          disabled={disabled}
           {...other}
         />
       </OuterLabelFieldWrapper>
@@ -183,40 +346,49 @@ class BaseAutocomplete extends Component {
   };
 
   render() {
-    const { displayedValue, suggestions } = this.state;
+    const { selectedOption, suggestions } = this.state;
     const {
       label,
       required,
       name,
+      infoTooltip,
       disabled,
+      size,
       error,
       helperText,
       placeholder = 'Search...',
+      inputRef,
     } = this.props;
 
     return (
-      <Autosuggest
-        alwaysRenderSuggestions
-        suggestions={suggestions}
-        onSuggestionsFetchRequested={this.debouncedFetchOptions}
-        onSuggestionsClearRequested={this.clearOptions}
-        renderSuggestionsContainer={this.renderContainer}
-        getSuggestionValue={this.handleSuggestionChange}
-        renderSuggestion={this.renderSuggestion}
-        renderInputComponent={this.renderInputComponent}
-        inputProps={{
-          label,
-          required,
-          disabled,
-          error,
-          helperText,
-          name,
-          placeholder,
-          value: displayedValue,
-          onKeyDown: this.onKeyDown,
-          onChange: this.handleInputChange,
-        }}
-      />
+      <>
+        <Autosuggest
+          alwaysRenderSuggestions
+          suggestions={suggestions}
+          onSuggestionsFetchRequested={this.debouncedFetchOptions}
+          onSuggestionsClearRequested={this.clearOptions}
+          renderSuggestionsContainer={this.renderContainer}
+          getSuggestionValue={this.handleSuggestionChange}
+          renderSuggestion={this.renderSuggestion}
+          renderInputComponent={this.renderInputComponent}
+          inputProps={{
+            label,
+            required,
+            disabled,
+            error,
+            helperText,
+            name,
+            placeholder,
+            infoTooltip,
+            size,
+            value: selectedOption?.value,
+            tag: selectedOption?.tag,
+            onKeyDown: this.onKeyDown,
+            onChange: this.handleInputChange,
+            inputRef,
+          }}
+        />
+      </>
     );
   }
 }
@@ -242,6 +414,7 @@ BaseAutocomplete.propTypes = {
       value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     }),
   ),
+  autofill: PropTypes.bool,
 };
 
 BaseAutocomplete.defaultProps = {
@@ -255,6 +428,7 @@ BaseAutocomplete.defaultProps = {
   value: '',
   options: [],
   suggester: null,
+  autofill: false,
 };
 
 export const AutocompleteInput = styled(BaseAutocomplete)`

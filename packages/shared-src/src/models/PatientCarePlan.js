@@ -1,22 +1,26 @@
-import { Sequelize } from 'sequelize';
-import { initSyncForModelNestedUnderPatient } from './sync';
+import { SYNC_DIRECTIONS } from 'shared/constants';
 import { Model } from './Model';
+import { dateTimeType } from './dateTimeTypes';
+import { buildPatientLinkedSyncFilter } from './buildPatientLinkedSyncFilter';
+import { getCurrentDateTimeString } from '../utils/dateTime';
+import { onSaveMarkPatientForSync } from './onSaveMarkPatientForSync';
 
 export class PatientCarePlan extends Model {
   static init({ primaryKey, ...options }) {
     super.init(
       {
         id: primaryKey,
-        date: { type: Sequelize.DATE, defaultValue: Sequelize.NOW, allowNull: false },
+        date: dateTimeType('date', {
+          defaultValue: getCurrentDateTimeString,
+          allowNull: false,
+        }),
       },
       {
         ...options,
-        syncConfig: {
-          ...initSyncForModelNestedUnderPatient(this, 'carePlan'),
-          includedRelations: ['notes'],
-        },
+        syncDirection: SYNC_DIRECTIONS.BIDIRECTIONAL,
       },
     );
+    onSaveMarkPatientForSync(this);
   }
 
   static initRelations(models) {
@@ -24,9 +28,9 @@ export class PatientCarePlan extends Model {
     this.belongsTo(models.ReferenceData, { foreignKey: 'carePlanId', as: 'carePlan' });
     this.belongsTo(models.User, { foreignKey: 'examinerId', as: 'examiner' });
 
-    this.hasMany(models.Note, {
+    this.hasMany(models.NotePage, {
       foreignKey: 'recordId',
-      as: 'notes',
+      as: 'notePages',
       constraints: false,
       scope: {
         recordType: this.name,
@@ -37,4 +41,6 @@ export class PatientCarePlan extends Model {
   static getListReferenceAssociations() {
     return ['carePlan', 'examiner'];
   }
+
+  static buildSyncFilter = buildPatientLinkedSyncFilter;
 }
