@@ -11,8 +11,9 @@
 | [mobile](packages/mobile) | [mobile runbook](https://beyond-essential.slab.com/posts/todo-tamanu-mobile-runbook-8vj8qceu) | The mobile app  |
 | [@tamanu/shared](packages/shared) | N/A | Shared code monolith among Tamanu components |
 | [@tamanu/build-tooling](packages/build-tooling) | N/A | Shared build tooling code |
-| [csca](packages/csca) | [csca runbook](https://beyond-essential.slab.com/posts/csca-runbook-be1td5ml), [signer runbook](https://beyond-essential.slab.com/posts/signer-runbook-hcws6er3) | A tool to create and manage a CSCA / ICAO eMRTD PKI |
-* central server has been omitted for security reasons
+| [csca](packages/csca) | [csca runbook](https://beyond-essential.slab.com/posts/csca-runbook-be1td5ml), [signer runbook](https://beyond-essential.slab.com/posts/signer-runbook-hcws6er3) | A tool to create and manage a CSCA / ICAO eMRTD PKI* |
+
+<sub>*omitted from public repo for security reasons</sub>
 The latest version for each Tamanu service (Servers, Web Client & Mobile Client) can be retrieved with a HTTP GET request via their respective public API routes:
 
 - Facility server: https://meta.tamanu.io/version/lan
