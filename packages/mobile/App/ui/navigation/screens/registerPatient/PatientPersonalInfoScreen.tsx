@@ -1,4 +1,4 @@
-import React, { useCallback, ReactElement } from 'react';
+import React, { ReactElement, useCallback } from 'react';
 import { StatusBar } from 'react-native';
 import { FullView } from '/styled/common';
 import { Header } from './CommonComponents/Header';
@@ -6,6 +6,8 @@ import { PatientPersonalInfoForm } from '/components/Forms/NewPatientForm/Patien
 import { theme } from '/styled/theme';
 import { Routes } from '/helpers/routes';
 import { PatientPersonalInfoScreenProps } from '../../../interfaces/screens/RegisterPatientStack/PatientPersonalInfoScreen';
+import { PatientSectionHeader } from '~/ui/components/Forms/NewPatientForm/PatientSectionHeader';
+import { TranslatedText } from '~/ui/components/Translations/TranslatedText';
 
 export const PatientPersonalInfoScreen = ({
   navigation,
@@ -18,6 +20,14 @@ export const PatientPersonalInfoScreen = ({
     <FullView background={theme.colors.BACKGROUND_GREY}>
       <StatusBar barStyle="light-content" />
       <Header onGoBack={onGoBack} />
+      <PatientSectionHeader
+        name={
+          <TranslatedText
+            stringId="patient.register.heading.general"
+            fallback="General Information"
+          />
+        }
+      />
       <PatientPersonalInfoForm />
     </FullView>
   );

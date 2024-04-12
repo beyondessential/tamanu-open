@@ -1,9 +1,18 @@
+// Much of this file is duplicated in `packages/web/app/utils/survey.js`
 import * as Yup from 'yup';
 
+import { READONLY_DATA_FIELDS } from '~/constants';
 import { getAgeFromDate, getAgeWithMonthsFromDate } from '~/ui/helpers/date';
-import { FieldTypes } from '~/ui/helpers/fields';
+import { getPatientDataDbLocation, checkMandatory, FieldTypes } from '~/ui/helpers/fields';
 import { joinNames } from '~/ui/helpers/user';
-import { IPatient, ISurveyScreenComponent, IUser, SurveyScreenValidationCriteria } from '~/types';
+import {
+  IPatient,
+  IPatientAdditionalData,
+  ISurveyScreenComponent,
+  IUser,
+  SurveyScreenValidationCriteria,
+} from '~/types';
+import { IPatientProgramRegistration } from '~/types/IPatientProgramRegistration';
 
 function getInitialValue(dataElement): string {
   switch (dataElement.type) {
@@ -17,19 +26,35 @@ function getInitialValue(dataElement): string {
   }
 }
 
-function transformPatientData(patient: IPatient, config): string {
+function transformPatientData(
+  patient: IPatient,
+  additionalData: IPatientAdditionalData | null,
+  patientProgramRegistration: IPatientProgramRegistration | null,
+  config,
+): string | undefined | null {
   const { column = 'fullName' } = config;
   const { dateOfBirth, firstName, lastName } = patient;
 
   switch (column) {
-    case 'age':
+    case READONLY_DATA_FIELDS.AGE:
       return getAgeFromDate(dateOfBirth).toString();
-    case 'ageWithMonths':
+    case READONLY_DATA_FIELDS.AGE_WITH_MONTHS:
       return getAgeWithMonthsFromDate(dateOfBirth);
-    case 'fullName':
+    case READONLY_DATA_FIELDS.FULL_NAME:
       return joinNames({ firstName, lastName });
-    default:
-      return patient[column];
+    default: {
+      const { modelName, fieldName } = getPatientDataDbLocation(column);
+      switch (modelName) {
+        case 'Patient':
+          return patient[fieldName];
+        case 'PatientAdditionalData':
+          return additionalData ? additionalData[fieldName] : undefined;
+        case 'PatientProgramRegistration':
+          return patientProgramRegistration ? patientProgramRegistration[fieldName] : undefined;
+        default:
+          return undefined;
+      }
+    }
   }
 }
 
@@ -37,6 +62,8 @@ export function getFormInitialValues(
   components: ISurveyScreenComponent[],
   currentUser: IUser,
   patient: IPatient,
+  patientAdditionalData: IPatientAdditionalData,
+  patientProgramRegistration: IPatientProgramRegistration,
 ): { [key: string]: any } {
   const initialValues = components.reduce<{ [key: string]: any }>((acc, { dataElement }) => {
     const initialValue = getInitialValue(dataElement);
@@ -62,7 +89,12 @@ export function getFormInitialValues(
 
     // patient data
     if (component.dataElement.type === 'PatientData') {
-      const patientValue = transformPatientData(patient, config);
+      const patientValue = transformPatientData(
+        patient,
+        patientAdditionalData,
+        patientProgramRegistration,
+        config,
+      );
       if (patientValue !== undefined) initialValues[component.dataElement.code] = patientValue;
     }
   }
@@ -102,7 +134,10 @@ function getFieldValidator(
   }
 }
 
-export function getFormSchema(components: ISurveyScreenComponent[]): Yup.ObjectSchema {
+export function getFormSchema(
+  components: ISurveyScreenComponent[],
+  valuesToCheckMandatory: { [key: string]: any } = {},
+): Yup.ObjectSchema {
   const objectShapeSchema = components.reduce<{ [key: string]: any }>((acc, component) => {
     const { dataElement } = component;
     const propName = dataElement.code;
@@ -110,7 +145,8 @@ export function getFormSchema(components: ISurveyScreenComponent[]): Yup.ObjectS
     const validator = getFieldValidator(dataElement, validationCriteria);
 
     if (!validator) return acc;
-    if (validationCriteria.mandatory) {
+    const mandatory = checkMandatory(validationCriteria.mandatory, valuesToCheckMandatory);
+    if (mandatory) {
       acc[propName] = validator.required('Required');
     } else {
       acc[propName] = validator.nullable();

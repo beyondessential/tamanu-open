@@ -1,10 +1,11 @@
 import React, { ReactElement, useEffect } from 'react';
 import Orientation from 'react-native-orientation';
-import { createMaterialTopTabNavigator } from '@react-navigation/material-top-tabs';
 import { Routes } from '/helpers/routes';
 import { VaccineHistoryTab } from '../screens/vaccine/tableTabs';
+import { createTopTabNavigator } from '/components/TopTabNavigator';
+import { TranslatedText } from '~/ui/components/Translations/TranslatedText';
 
-const Tab = createMaterialTopTabNavigator();
+const Tabs = createTopTabNavigator();
 
 export const VaccineTableTabs = (): ReactElement => {
   useEffect(() => {
@@ -16,28 +17,39 @@ export const VaccineTableTabs = (): ReactElement => {
   }, []);
 
   return (
-    <Tab.Navigator swipeEnabled={false}>
-      <Tab.Screen
+    <Tabs.Navigator
+      tabBarOptions={{
+        labelStyle: { textTransform: 'none' },
+      }}
+      swipeEnabled={false}
+    >
+      <Tabs.Screen
         options={{
-          title: 'Routine',
+          title: () => (
+            <TranslatedText stringId="vaccine.form.category.option.routine" fallback="Routine" />
+          ),
         }}
         name={Routes.HomeStack.VaccineStack.VaccineTabs.Routine}
         component={VaccineHistoryTab}
       />
-      <Tab.Screen
+      <Tabs.Screen
         options={{
-          title: 'Catchup',
+          title: () => (
+            <TranslatedText stringId="vaccine.form.category.option.catchUp" fallback="Catchup" />
+          ),
         }}
         name={Routes.HomeStack.VaccineStack.VaccineTabs.Catchup}
         component={VaccineHistoryTab}
       />
-      <Tab.Screen
+      <Tabs.Screen
         options={{
-          title: 'Campaign',
+          title: () => (
+            <TranslatedText stringId="vaccine.form.category.option.campaign" fallback="Campaign" />
+          ),
         }}
         name={Routes.HomeStack.VaccineStack.VaccineTabs.Campaign}
         component={VaccineHistoryTab}
       />
-    </Tab.Navigator>
+    </Tabs.Navigator>
   );
 };

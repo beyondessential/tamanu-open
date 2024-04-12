@@ -1,4 +1,4 @@
-import React, { ReactElement, useCallback, useMemo } from 'react';
+import React, { ReactElement, useCallback } from 'react';
 import { compose } from 'redux';
 import { NavigationProp } from '@react-navigation/native';
 import { Routes } from '/helpers/routes';
@@ -16,9 +16,7 @@ type NewProgramEntryTabsProps = {
   selectedPatient: IPatient;
 };
 
-const getPatientName = (
-  patient: IPatient,
-): string => joinNames(patient);
+const getPatientName = (patient: IPatient): string => joinNames(patient);
 
 const DumbLabRequestTabs = ({
   navigation,
@@ -30,24 +28,25 @@ const DumbLabRequestTabs = ({
 
   return (
     <>
-      <StackHeader title="Lab Request" subtitle={getPatientName(selectedPatient)} onGoBack={goBack} />
-      <Tabs.Navigator
-        swipeEnabled={false}
-        lazy
-      >
+      <StackHeader
+        title="New Test - Lab request"
+        subtitle={getPatientName(selectedPatient)}
+        onGoBack={goBack}
+      />
+      <Tabs.Navigator swipeEnabled={false} lazy>
         <Tabs.Screen
           options={{
-            title: 'View History',
-          }}
-          name={Routes.HomeStack.LabRequestStack.LabRequestTabs.ViewHistory}
-          component={ViewHistoryScreen}
-        />
-        <Tabs.Screen
-          options={{
-            title: 'New Request',
+            title: 'New test',
           }}
           name={Routes.HomeStack.LabRequestStack.LabRequestTabs.NewRequest}
           component={AddLabRequestScreen}
+        />
+        <Tabs.Screen
+          options={{
+            title: 'Request history',
+          }}
+          name={Routes.HomeStack.LabRequestStack.LabRequestTabs.ViewHistory}
+          component={ViewHistoryScreen}
         />
       </Tabs.Navigator>
     </>

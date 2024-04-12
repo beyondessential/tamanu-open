@@ -1,8 +1,13 @@
-import { Entity, Column, ManyToOne, OneToMany, RelationId } from 'typeorm/browser';
+import { Column, Entity, ManyToOne, OneToMany, RelationId } from 'typeorm/browser';
 
-import { ISurveyResponse, EncounterType, ICreateSurveyResponse } from '~/types';
+import { EncounterType, ICreateSurveyResponse, ISurveyResponse } from '~/types';
 
-import { getStringValue, getResultValue, isCalculated, FieldTypes } from '~/ui/helpers/fields';
+import {
+  FieldTypes,
+  getResultValue,
+  getStringValue,
+  getPatientDataDbLocation,
+} from '~/ui/helpers/fields';
 
 import { runCalculations } from '~/ui/helpers/calculations';
 import { getCurrentDateTimeString } from '~/ui/helpers/date';
@@ -10,12 +15,88 @@ import { getCurrentDateTimeString } from '~/ui/helpers/date';
 import { BaseModel } from './BaseModel';
 import { Survey } from './Survey';
 import { Encounter } from './Encounter';
+import { ProgramRegistry } from './ProgramRegistry';
 import { SurveyResponseAnswer } from './SurveyResponseAnswer';
 import { Referral } from './Referral';
 import { Patient } from './Patient';
 import { PatientAdditionalData } from './PatientAdditionalData';
+import { VitalLog } from './VitalLog';
 import { SYNC_DIRECTIONS } from './types';
 import { DateTimeStringColumn } from './DateColumns';
+import { PatientProgramRegistration } from './PatientProgramRegistration';
+import { VisibilityStatus } from '../visibilityStatuses';
+
+type RecordValuesByModel = {
+  Patient?: Record<string, string>;
+  PatientAdditionalData?: Record<string, string>;
+  PatientProgramRegistration?: Record<string, string>;
+};
+
+const getFieldsToWrite = (questions, answers): RecordValuesByModel => {
+  const recordValuesByModel = {};
+
+  const patientDataQuestions = questions.filter(
+    q => q.dataElement.type === FieldTypes.PATIENT_DATA,
+  );
+  for (const question of patientDataQuestions) {
+    const config = question.getConfigObject();
+    const { dataElement } = question;
+
+    if (!config.writeToPatient) {
+      // this is just a question that's reading patient data, not writing it
+      continue;
+    }
+
+    const { fieldName: configFieldName } = config.writeToPatient || {};
+    if (!configFieldName) {
+      throw new Error('No fieldName defined for writeToPatient config');
+    }
+
+    const value = answers[dataElement.code];
+    const { modelName, fieldName } = getPatientDataDbLocation(configFieldName);
+    if (!modelName) {
+      throw new Error(`Unknown fieldName: ${configFieldName}`);
+    }
+    if (!recordValuesByModel[modelName]) recordValuesByModel[modelName] = {};
+    recordValuesByModel[modelName][fieldName] = value;
+  }
+  return recordValuesByModel;
+};
+
+/**
+ * DUPLICATED IN shared/models/SurveyResponse.js
+ * Please keep in sync
+ */
+async function writeToPatientFields(questions, answers, patientId, surveyId, userId, submittedTime) {
+  const valuesByModel = getFieldsToWrite(questions, answers);
+
+  if (valuesByModel.Patient) {
+    await Patient.updateValues(patientId, valuesByModel.Patient);
+  }
+
+  if (valuesByModel.PatientAdditionalData) {
+    await PatientAdditionalData.updateForPatient(patientId, valuesByModel.PatientAdditionalData);
+  }
+
+  if (valuesByModel.PatientProgramRegistration) {
+    const { programId } = await Survey.findOne({ id: surveyId });
+    const { id: programRegistryId } = await ProgramRegistry.findOne({
+      where: { program: { id: programId }, visibilityStatus: VisibilityStatus.Current },
+    });
+    if (!programRegistryId) {
+      throw new Error('No program registry configured for the current form');
+    }
+    await PatientProgramRegistration.appendRegistration(
+      patientId,
+      programRegistryId,
+      {
+        date: submittedTime,
+        ...valuesByModel.PatientProgramRegistration,
+        clinicianId: valuesByModel.PatientProgramRegistration.clinicianId || userId,
+      },
+    );
+  }
+}
 
 @Entity('survey_response')
 export class SurveyResponse extends BaseModel implements ISurveyResponse {
@@ -68,7 +149,7 @@ export class SurveyResponse extends BaseModel implements ISurveyResponse {
     const response = await repo.findOne(surveyId, {
       relations: ['survey', 'encounter', 'encounter.patient'],
     });
-    const questions = await response.survey.getComponents();
+    const questions = await response.survey.getComponents({ includeAllVitals: true });
     const answers = await SurveyResponseAnswer.getRepository().find({
       where: {
         response: response.id,
@@ -119,13 +200,16 @@ export class SurveyResponse extends BaseModel implements ISurveyResponse {
 
       setNote('Attaching answers...');
 
-      // these will store values to write to patient records following submission
-      const patientRecordValues = {};
-      const patientAdditionalDataValues = {};
+      // figure out if its a vital survey response
+      let vitalsSurvey;
+      try {
+        vitalsSurvey = await Survey.getVitalsSurvey({ includeAllVitals: false });
+      } catch (e) {
+        console.error(`Errored while trying to get vitals survey: ${e}`);
+      }
 
-      // TODO: this should just look at the field name and decide; there will never be overlap
-      const isAdditionalDataField = questionConfig =>
-        questionConfig.writeToPatient?.isAdditionalDataField;
+      // use optional chaining because vitals survey might not exist
+      const isVitalSurvey = surveyId === vitalsSurvey?.id;
 
       for (const a of Object.entries(finalValues)) {
         const [dataElementCode, value] = a;
@@ -138,42 +222,40 @@ export class SurveyResponse extends BaseModel implements ISurveyResponse {
         }
         const { dataElement } = component;
 
-        if (isCalculated(dataElement.type) && value !== 0 && !value) {
-          // calculated values will always be in the answer object - but we
-          // shouldn't save null answers
+        const body = getStringValue(dataElement.type, value);
+        // Don't create null answers
+        if (body === null) {
           continue;
         }
 
-        if (dataElement.type === FieldTypes.PATIENT_DATA) {
-          const questionConfig = component.getConfigObject();
-          const fieldName = questionConfig.writeToPatient?.fieldName;
-          if (fieldName) {
-            if (isAdditionalDataField(questionConfig)) {
-              patientAdditionalDataValues[fieldName] = value;
-            } else {
-              patientRecordValues[fieldName] = value;
-            }
-          }
-        }
-
-        const body = getStringValue(dataElement.type, value);
-
         setNote(`Attaching answer for ${dataElement.id}...`);
-        await SurveyResponseAnswer.createAndSaveOne({
+        const answerRecord = await SurveyResponseAnswer.createAndSaveOne({
           dataElement: dataElement.id,
           body,
           response: responseRecord.id,
         });
-      }
-      setNote('Done');
 
-      // Save values to database records
-      if (Object.keys(patientRecordValues).length) {
-        await Patient.updateValues(patientId, patientRecordValues);
+        if (!isVitalSurvey || body === '') continue;
+        setNote(`Attaching initial vital log for ${answerRecord.id}...`);
+        await VitalLog.createAndSaveOne({
+          date: responseRecord.endTime,
+          newValue: body,
+          recordedBy: userId,
+          answer: answerRecord.id,
+        });
       }
-      if (Object.keys(patientAdditionalDataValues).length) {
-        await PatientAdditionalData.updateForPatient(patientId, patientAdditionalDataValues);
-      }
+      setNote('Writing patient data');
+
+      await writeToPatientFields(
+        components,
+        finalValues,
+        patientId,
+        surveyId,
+        userId,
+        responseRecord.endTime,
+      );
+
+      setNote('Done');
 
       return responseRecord;
     } catch (e) {
@@ -183,14 +265,19 @@ export class SurveyResponse extends BaseModel implements ISurveyResponse {
     }
   }
 
-  static async getForPatient(patientId: string, surveyId: string): Promise<SurveyResponse[]> {
-    return this.getRepository()
+  static async getForPatient(patientId: string, surveyId?: string): Promise<SurveyResponse[]> {
+    const query = this.getRepository()
       .createQueryBuilder('survey_response')
       .leftJoinAndSelect('survey_response.encounter', 'encounter')
       .leftJoinAndSelect('survey_response.survey', 'survey')
       .where('encounter.patientId = :patientId', { patientId })
-      .andWhere('survey.id = :surveyId', { surveyId: surveyId.toLowerCase() })
       .orderBy('survey_response.endTime', 'DESC')
-      .getMany();
+      .take(80);
+
+    if (surveyId) {
+      query.andWhere('survey.id = :surveyId', { surveyId: surveyId.toLowerCase() });
+    }
+
+    return query.getMany();
   }
 }

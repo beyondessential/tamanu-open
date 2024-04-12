@@ -1,11 +1,11 @@
 import React, { FC } from 'react';
-import { StyleSheet } from 'react-native';
 import styled from 'styled-components/native';
-import { RowView, StyledText, StyledView } from '/styled/common';
+import { RowView, StyledText } from '/styled/common';
 import { theme } from '/styled/theme';
-import { screenPercentageToDP, Orientation } from '/helpers/screen';
-import { RadioOption, RadioButton } from '../RadioButton';
+import { Orientation, screenPercentageToDP } from '/helpers/screen';
+import { RadioButton, RadioOption } from '../RadioButton';
 import { TextFieldErrorMessage } from '/components/TextField/TextFieldErrorMessage';
+import { RequiredIndicator } from '../RequiredIndicator';
 
 export interface RadioButtonGroupProps {
   options: RadioOption[];
@@ -14,19 +14,14 @@ export interface RadioButtonGroupProps {
   error?: boolean;
   index?: number;
   label?: string;
+  required?: boolean;
   CustomComponent?: FC<any>;
 }
-
-const getTitleColor = (value?: string, error?: boolean): string => {
-  if (value) return theme.colors.TEXT_MID;
-  if (error) return theme.colors.ALERT;
-  return theme.colors.TEXT_SOFT;
-};
 
 const Label = styled(StyledText)`
   color: ${theme.colors.TEXT_SUPER_DARK};
   font-size: ${screenPercentageToDP(2.1, Orientation.Height)};
-  font-weight: 600;
+  font-weight: 500;
   padding-left: ${screenPercentageToDP(1, Orientation.Width)};
   margin-bottom: ${screenPercentageToDP(0.5, Orientation.Width)};
 `;
@@ -37,6 +32,7 @@ export const RadioButtonGroup = ({
   value,
   error,
   label,
+  required = false,
   CustomComponent,
 }: RadioButtonGroupProps): JSX.Element => {
   const RadioComponent = CustomComponent || RadioButton;
@@ -44,9 +40,12 @@ export const RadioButtonGroup = ({
   return (
     <>
       {Boolean(label) && (
-        <Label>{label}</Label>
+        <Label fontSize={14} fontWeight={500}>
+          {label}
+          {required && <RequiredIndicator />}
+        </Label>
       )}
-      <RowView>
+      <RowView marginBottom={10}>
         {options.map((option, index) => (
           <RadioComponent
             key={option.label}

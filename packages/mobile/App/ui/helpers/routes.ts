@@ -11,6 +11,7 @@ export const Routes = {
   Autocomplete: {
     Index: '',
     Modal: '',
+    MultiSelectModal: '',
   },
   SignUpStack: {
     Index: '',
@@ -22,6 +23,7 @@ export const Routes = {
     SelectFacility: '',
     ResetPassword: '',
     ChangePassword: '',
+    LanguageSelect: '',
   },
   HomeStack: {
     Index: '',
@@ -58,12 +60,14 @@ export const Routes = {
     },
     ProgramStack: {
       Index: '',
-      ProgramListScreen: '',
       SurveyResponseDetailsScreen: '',
       ProgramTabs: {
         Index: '',
-        AddDetails: '',
-        ViewHistory: '',
+        SurveyTabs: {
+          Index: '',
+          AddDetails: '',
+          ViewHistory: '',
+        },
       },
     },
     ReferralStack: {
@@ -92,10 +96,6 @@ export const Routes = {
       PrescribeMedication: '',
       ViewHistory: '',
     },
-    DeceasedStack: {
-      Index: '',
-      AddDeceasedDetails: '',
-    },
     LabRequestStack: {
       Index: '',
       LabRequestTabs: {
@@ -111,6 +111,16 @@ export const Routes = {
         Vitals: '',
         Vaccines: '',
       },
+    },
+    PatientSummaryStack: {
+      Index: '',
+    },
+    PatientProgramRegistryFormStack: {
+      Index: '',
+      PatientProgramRegistryForm: '',
+    },
+    PatientProgramRegistrationDetailsStack: {
+      Index: '',
     },
     RegisterPatientStack: {
       Index: '',

@@ -1,17 +1,17 @@
-import React, { useState, useCallback, ReactElement } from 'react';
-import { TouchableWithoutFeedback, StyleSheet } from 'react-native';
+import React, { ReactElement, useCallback, useState } from 'react';
+import { StyleSheet, TouchableWithoutFeedback } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { parseISO } from 'date-fns';
-import { StyledView, StyledText } from '/styled/common';
+import { StyledText, StyledView } from '/styled/common';
 import { formatDate } from '/helpers/date';
 import { theme } from '/styled/theme';
 import { DateFormats } from '/helpers/constants';
-import { screenPercentageToDP, Orientation } from '/helpers/screen';
+import { Orientation, screenPercentageToDP } from '/helpers/screen';
 import * as Icons from '../Icons';
-import { TextFieldLabel } from '../TextField/TextFieldLabel';
 import { InputContainer } from '../TextField/styles';
 import { BaseInputProps } from '../../interfaces/BaseInputProps';
 import { TextFieldErrorMessage } from '/components/TextField/TextFieldErrorMessage';
+import { RequiredIndicator } from '../RequiredIndicator';
 
 const styles = StyleSheet.create({
   androidPickerStyles: {
@@ -95,7 +95,7 @@ export const DateField = React.memo(
     const formatValue = useCallback(() => {
       if (value) {
         if (mode === 'date') return formatDate(dateValue, DateFormats.DDMMYY);
-        return formatDate(dateValue, DateFormats.TIME_HHMMSS);
+        return formatDate(dateValue, DateFormats.TIME);
       }
       return null;
     }, [mode, value]);
@@ -105,17 +105,16 @@ export const DateField = React.memo(
     const formattedValue = formatValue();
 
     return (
-
       <StyledView marginBottom={screenPercentageToDP(2.24, Orientation.Height)} width="100%">
         {!!label && (
           <StyledText
-            fontSize={14}
+            fontSize={screenPercentageToDP(2.1, Orientation.Height)}
             fontWeight={600}
             marginBottom={2}
             color={theme.colors.TEXT_SUPER_DARK}
           >
             {label}
-            {required && <StyledText color={theme.colors.ALERT}> *</StyledText>}
+            {required && <RequiredIndicator />}
           </StyledText>
         )}
         <StyledView height={screenPercentageToDP('6.68', Orientation.Height)} width="100%">
@@ -139,7 +138,11 @@ export const DateField = React.memo(
               >
                 {formattedValue || placeholder}
               </StyledText>
-              <StyledView marginRight={10} height="100%" justifyContent="center">
+              <StyledView
+                marginRight={10}
+                height="100%"
+                width={screenPercentageToDP(2.4, Orientation.Height)}
+              >
                 <IconComponent
                   height={screenPercentageToDP(2.4, Orientation.Height)}
                   width={screenPercentageToDP(2.4, Orientation.Height)}

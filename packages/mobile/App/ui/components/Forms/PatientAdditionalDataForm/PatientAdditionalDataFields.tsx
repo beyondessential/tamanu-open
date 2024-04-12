@@ -1,42 +1,43 @@
 import React, { ReactElement } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import { StyledView } from '/styled/common';
-import { theme } from '/styled/theme';
-import { Button } from '../../Button';
 import { TextField } from '../../TextField/TextField';
 import { Dropdown } from '~/ui/components/Dropdown';
 import { useLocalisation } from '~/ui/contexts/LocalisationContext';
 import { LocalisedField } from '~/ui/components/Forms/LocalisedField';
+import { Field } from '~/ui/components/Forms/FormField';
 import { AutocompleteModalField } from '~/ui/components/AutocompleteModal/AutocompleteModalField';
-import { Routes } from '~/ui/helpers/routes';
+import { PatientFieldDefinitionComponents } from '~/ui/helpers/fieldComponents';
 import { useBackend } from '~/ui/hooks';
 
 import {
+  getSuggester,
   plainFields,
-  selectFields,
-  selectFieldsOptions,
   relationIdFields,
   relationIdFieldsProperties,
-  getSuggester,
+  selectFields,
+  selectFieldsOptions,
 } from './helpers';
+import { getConfiguredPatientAdditionalDataFields } from '~/ui/helpers/patient';
 
-const PlainField = ({ fieldName }): ReactElement => (
+const PlainField = ({ fieldName, required }): ReactElement => (
   // Outter styled view to momentarily add distance between fields
   <StyledView key={fieldName} paddingTop={15}>
-    <LocalisedField name={fieldName} component={TextField} />
+    <LocalisedField name={fieldName} component={TextField} required={required} />
   </StyledView>
 );
 
-const SelectField = ({ fieldName }): ReactElement => (
+const SelectField = ({ fieldName, required }): ReactElement => (
   <LocalisedField
     key={fieldName}
     name={fieldName}
     options={selectFieldsOptions[fieldName]}
     component={Dropdown}
+    required={required}
   />
 );
 
-const RelationField = ({ fieldName }): ReactElement => {
+const RelationField = ({ fieldName, required }): ReactElement => {
   const { models } = useBackend();
   const { getString } = useLocalisation();
   const navigation = useNavigation();
@@ -51,13 +52,13 @@ const RelationField = ({ fieldName }): ReactElement => {
       placeholder={`Search for ${localisedPlaceholder}`}
       navigation={navigation}
       suggester={suggester}
-      modalRoute={Routes.Autocomplete.Modal}
       name={fieldName}
+      required={required}
     />
   );
 };
 
-function getComponentForField(fieldName: string): React.FC<{ fieldName: string}> {
+function getComponentForField(fieldName: string): React.FC<{ fieldName: string }> {
   if (plainFields.includes(fieldName)) {
     return PlainField;
   }
@@ -71,22 +72,30 @@ function getComponentForField(fieldName: string): React.FC<{ fieldName: string}>
   throw new Error(`Unexpected field ${fieldName} for patient additional data.`);
 }
 
-export const PatientAdditionalDataFields = ({
-  handleSubmit,
-  isSubmitting,
-  fields,
-}): ReactElement => (
-  <StyledView justifyContent="space-between">
-    {fields.map(fieldName => {
-      const Component = getComponentForField(fieldName);
-      return <Component fieldName={fieldName} key={fieldName} />;
-    })}
-    <Button
-      backgroundColor={theme.colors.PRIMARY_MAIN}
-      onPress={handleSubmit}
-      loadingAction={isSubmitting}
-      buttonText="Save"
-      marginTop={10}
+const getCustomFieldComponent = ({ id, name, options, fieldType }) => {
+  return (
+    <Field
+      name={id}
+      label={name}
+      component={PatientFieldDefinitionComponents[fieldType]}
+      options={options?.split(',')?.map(option => ({ label: option, value: option }))}
     />
-  </StyledView>
-);
+  );
+};
+
+export const PatientAdditionalDataFields = ({
+  fields,
+  isCustomFields,
+  showMandatory = true,
+}): ReactElement => {
+  const { getBool } = useLocalisation();
+
+  if (isCustomFields) return fields.map(getCustomFieldComponent);
+
+  const padFields = getConfiguredPatientAdditionalDataFields(fields, showMandatory, getBool);
+
+  return padFields.map(fieldName => {
+    const Component = getComponentForField(fieldName);
+    return <Component fieldName={fieldName} key={fieldName} required={showMandatory} />;
+  });
+};

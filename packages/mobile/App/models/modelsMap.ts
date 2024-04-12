@@ -1,11 +1,21 @@
+import { TranslatedString } from './TranslatedString';
 import { ReferenceData } from './ReferenceData';
 import { Patient } from './Patient';
 import { PatientAdditionalData } from './PatientAdditionalData';
+import { PatientFieldValue } from './PatientFieldValue';
+import { PatientFieldDefinition } from './PatientFieldDefinition';
+import { PatientFieldDefinitionCategory } from './PatientFieldDefinitionCategory';
 import { PatientIssue } from './PatientIssue';
 import { PatientSecondaryId } from './PatientSecondaryId';
 import { User } from './User';
 import { Encounter } from './Encounter';
+import { EncounterHistory } from './EncounterHistory';
 import { Program } from './Program';
+import { ProgramRegistry } from './ProgramRegistry';
+import { ProgramRegistryCondition } from './ProgramRegistryCondition';
+import { PatientProgramRegistration } from './PatientProgramRegistration';
+import { PatientProgramRegistrationCondition } from './PatientProgramRegistrationCondition';
+import { ProgramRegistryClinicalStatus } from './ProgramRegistryClinicalStatus';
 import { ProgramDataElement } from './ProgramDataElement';
 import { Survey } from './Survey';
 import { SurveyScreenComponent } from './SurveyScreenComponent';
@@ -26,26 +36,41 @@ import { BaseModel } from './BaseModel';
 import { LabRequest } from './LabRequest';
 import { LabTest } from './LabTest';
 import { LabTestType } from './LabTestType';
+import { LabTestPanelRequest } from './LabTestPanelRequest';
+import { LabTestPanel } from './LabTestPanel';
 import { LocalSystemFact } from './LocalSystemFact';
 import { PatientFacility } from './PatientFacility';
-import { NotePage } from './NotePage';
-import { NoteItem } from './NoteItem';
 import { Setting } from './Setting';
+import { LegacyNotePage } from './LegacyNotePage';
+import { LegacyNoteItem } from './LegacyNoteItem';
+import { Note } from './Note';
+import { VitalLog } from './VitalLog';
 
 export const MODELS_MAP = {
   ReferenceData,
+  TranslatedString,
   Patient,
   PatientAdditionalData,
+  PatientFieldDefinitionCategory,
+  PatientFieldDefinition,
+  PatientFieldValue,
   PatientIssue,
   PatientSecondaryId,
   User,
   Encounter,
+  EncounterHistory,
   Program,
+  ProgramRegistry,
+  ProgramRegistryCondition,
+  PatientProgramRegistration,
+  PatientProgramRegistrationCondition,
+  ProgramRegistryClinicalStatus,
   ProgramDataElement,
   Survey,
   SurveyScreenComponent,
   SurveyResponse,
   SurveyResponseAnswer,
+  VitalLog,
   Vitals,
   Diagnosis,
   ScheduledVaccine,
@@ -60,10 +85,13 @@ export const MODELS_MAP = {
   LabRequest,
   LabTest,
   LabTestType,
+  LabTestPanel,
+  LabTestPanelRequest,
   LocalSystemFact,
   PatientFacility,
-  NotePage,
-  NoteItem,
   Setting,
+  LegacyNotePage,
+  LegacyNoteItem,
+  Note,
 };
 export const MODELS_ARRAY: typeof BaseModel[] = Object.values(MODELS_MAP);

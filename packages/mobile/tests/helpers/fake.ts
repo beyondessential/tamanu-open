@@ -5,7 +5,6 @@ import { formatISO9075 } from 'date-fns';
 import {
   DataElementType,
   EncounterType,
-  SurveyTypes,
   IAdministeredVaccine,
   IEncounter,
   IPatient,
@@ -19,6 +18,7 @@ import {
   ISurveyScreenComponent,
   IUser,
   ReferenceDataType,
+  SurveyTypes,
 } from '~/types';
 
 import { BaseModel } from '~/models/BaseModel';
@@ -128,6 +128,7 @@ export const fakeUser = (): IUser => {
   const uuid = uuidv4();
   return {
     id: `user-id-${uuid}`,
+    displayId: `user-displayId-${uuid}`,
     email: `user-email-${uuid}@example.com`,
     displayName: `user-displayName-${uuid}`,
     role: 'practitioner',
