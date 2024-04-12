@@ -1,8 +1,8 @@
 import React from 'react';
-import { TouchableHighlight, StyleSheet } from 'react-native';
+import { StyleSheet, TouchableHighlight } from 'react-native';
 import { theme } from '/styled/theme';
-import { StyledView, StyledText } from '/styled/common';
-import { screenPercentageToDP, Orientation } from '/helpers/screen';
+import { StyledText, StyledView } from '/styled/common';
+import { Orientation, screenPercentageToDP } from '/helpers/screen';
 import { MenuOptionButtonProps } from '~types/MenuOptionButtonProps';
 
 const styles = StyleSheet.create({
@@ -16,25 +16,21 @@ const styles = StyleSheet.create({
   },
 });
 
-export const PatientMenuButton = ({
-  title,
-  Icon,
-  onPress,
-}: MenuOptionButtonProps): JSX.Element => (
+export const PatientMenuButton = ({ title, Icon, onPress }: MenuOptionButtonProps): JSX.Element => (
   <TouchableHighlight underlayColor={theme.colors.BOX_OUTLINE} onPress={onPress}>
     <StyledView
       style={styles.buttonContainer}
-      paddingTop={screenPercentageToDP('2.77', Orientation.Height)}
-      height={screenPercentageToDP(15.5, Orientation.Height)}
-      width={screenPercentageToDP(29.68, Orientation.Width)}
-      borderRadius={3}
+      paddingTop={screenPercentageToDP(3, Orientation.Height)}
+      height={screenPercentageToDP(16.5, Orientation.Height)}
+      width={screenPercentageToDP(29, Orientation.Width)}
+      borderRadius={5}
       background={theme.colors.WHITE}
       alignItems="center"
       boxShadow="0px 0px 5px rgba(0,0,0,0.1)"
     >
       <Icon
-        height={screenPercentageToDP('5.83', Orientation.Height)}
-        width={screenPercentageToDP('5.83', Orientation.Height)}
+        height={screenPercentageToDP('5.9', Orientation.Height)}
+        width={screenPercentageToDP('5.9', Orientation.Height)}
       />
       <StyledView style={styles.textContainer}>
         <StyledText

@@ -11,8 +11,6 @@ import { ProgramStack } from './ProgramStack';
 import { VitalsStack } from './VitalsStack';
 import { DiagnosisAndTreatmentTabs } from './DiagnosisAndTreatmentTabs';
 import { ReferralStack } from './ReferralStack';
-import { DeceasedStack } from './DeceasedStack';
-import { PatientActionsScreen } from '../screens/patientActions';
 import { HistoryVitalsStack } from './HistoryVitalsStack';
 import { ExportDataScreen } from '../screens/home/ExportDataScreen';
 import { LabRequestStack } from './LabRequestStack';
@@ -22,6 +20,9 @@ import { Routes } from '/helpers/routes';
 import { RegisterPatientStack } from './RegisterPatientStack';
 import { PatientDetailsStack } from './PatientDetailsStack';
 import { useAuth } from '~/ui/contexts/AuthContext';
+import { PatientProgramRegistrationDetailsStack } from './PatientProgramRegistrationDetailsStack';
+import { PatientSummaryStack } from './PatientSummaryStack';
+import { PatientProgramRegistryFormStack } from './PatientProgramRegistryForm';
 
 const Stack = createStackNavigator();
 
@@ -62,7 +63,18 @@ export const HomeStack = (): ReactElement => {
         name={Routes.HomeStack.HistoryVitalsStack.Index}
         component={HistoryVitalsStack}
       />
-      <Stack.Screen name={Routes.HomeStack.PatientActions} component={PatientActionsScreen} />
+      <Stack.Screen
+        name={Routes.HomeStack.PatientSummaryStack.Index}
+        component={PatientSummaryStack}
+      />
+      <Stack.Screen
+        name={Routes.HomeStack.PatientProgramRegistryFormStack.Index}
+        component={PatientProgramRegistryFormStack}
+      />
+      <Stack.Screen
+        name={Routes.HomeStack.PatientProgramRegistrationDetailsStack.Index}
+        component={PatientProgramRegistrationDetailsStack}
+      />
       <Stack.Screen
         name={Routes.HomeStack.SearchPatientStack.Index}
         component={SearchPatientStack}
@@ -72,7 +84,6 @@ export const HomeStack = (): ReactElement => {
         component={DiagnosisAndTreatmentTabs}
       />
       <Stack.Screen name={Routes.HomeStack.ReferralStack.Index} component={ReferralStack} />
-      <Stack.Screen name={Routes.HomeStack.DeceasedStack.Index} component={DeceasedStack} />
       <Stack.Screen name={Routes.HomeStack.LabRequestStack.Index} component={LabRequestStack} />
     </Stack.Navigator>
   );

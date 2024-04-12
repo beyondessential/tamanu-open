@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useFormikContext } from 'formik';
 import { NavigationProp } from '@react-navigation/native';
 
@@ -8,7 +8,7 @@ import { AutocompleteModalField } from './AutocompleteModal/AutocompleteModalFie
 import { Suggester } from '~/ui/helpers/suggester';
 import { useFacility } from '~/ui/contexts/FacilityContext';
 import { useBackend } from '~/ui/hooks';
-import { Routes } from '~/ui/helpers/routes';
+import { TranslatedText } from './Translations/TranslatedText';
 
 interface LocationFieldProps {
   navigation: NavigationProp<any>;
@@ -56,9 +56,8 @@ export const LocationField: React.FC<LocationFieldProps> = ({ navigation, requir
         component={AutocompleteModalField}
         navigation={navigation}
         suggester={locationGroupSuggester}
-        modalRoute={Routes.Autocomplete.Modal}
         name="locationGroupId"
-        label="Area"
+        label={<TranslatedText stringId="general.form.area.label" fallback="Area" />}
         placeholder="Search..."
         required={required}
         onChange={handleChangeLocationGroup}
@@ -68,9 +67,8 @@ export const LocationField: React.FC<LocationFieldProps> = ({ navigation, requir
         component={AutocompleteModalField}
         navigation={navigation}
         suggester={locationSuggester}
-        modalRoute={Routes.Autocomplete.Modal}
         name="locationId"
-        label="Location"
+        label={<TranslatedText stringId="general.form.location.label" fallback="Location" />}
         placeholder="Search..."
         disabled={!values.locationGroupId}
         required={required}

@@ -1,15 +1,20 @@
-import React, { useEffect, useState, ReactElement } from 'react';
+import React, { ReactElement, useEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import { StyledView, StyledText } from '/styled/common';
-import { screenPercentageToDP, Orientation } from '../../helpers/screen';
-import { Suggester, BaseModelSubclass } from '../../helpers/suggester';
+import { StyledText, StyledView } from '/styled/common';
+import { Orientation, screenPercentageToDP } from '../../helpers/screen';
+import { BaseModelSubclass, Suggester } from '../../helpers/suggester';
 import { theme } from '../../styled/theme';
 import { Button } from '../Button';
+import { Routes } from '~/ui/helpers/routes';
 import { TextFieldErrorMessage } from '/components/TextField/TextFieldErrorMessage';
+import { RequiredIndicator } from '../RequiredIndicator';
+import { TranslatedTextElement, TranslatedText } from '../Translations/TranslatedText';
+import { SearchIcon } from '../Icons';
+import { ReadOnlyField } from '../ReadOnlyField/index';
 
 interface AutocompleteModalFieldProps {
   value?: string;
-  placeholder?: string;
+  placeholder?: TranslatedTextElement;
   onChange: (newValue: string) => void;
   suggester: Suggester<BaseModelSubclass>;
   modalRoute: string;
@@ -18,6 +23,7 @@ interface AutocompleteModalFieldProps {
   label?: string;
   required?: boolean;
   disabled?: boolean;
+  readOnly?: boolean;
 }
 
 export const AutocompleteModalField = ({
@@ -26,11 +32,12 @@ export const AutocompleteModalField = ({
   placeholder,
   onChange,
   suggester,
-  modalRoute,
+  modalRoute = Routes.Autocomplete.Modal,
   error,
   required,
   marginTop = 0,
   disabled = false,
+  readOnly = false,
 }: AutocompleteModalFieldProps): ReactElement => {
   const navigation = useNavigation();
   const [label, setLabel] = useState(null);
@@ -52,29 +59,38 @@ export const AutocompleteModalField = ({
       if (data) {
         setLabel(data.label);
       } else {
-        setLabel(placeholder);
+        setLabel(null);
       }
     })();
   }, [value]);
+
+  const fontSize = screenPercentageToDP(2.1, Orientation.Height);
+
+  if (readOnly) {
+    return <ReadOnlyField value={label} />;
+  }
 
   return (
     <StyledView marginBottom={screenPercentageToDP('2.24', Orientation.Height)} width="100%">
       {!!fieldLabel && (
         <StyledText
-          fontSize={14}
+          fontSize={fontSize}
           fontWeight={600}
           marginBottom={2}
           color={theme.colors.TEXT_SUPER_DARK}
         >
           {fieldLabel}
-          {required && <StyledText color={theme.colors.ALERT}> *</StyledText>}
+          {required && <RequiredIndicator />}
         </StyledText>
       )}
       <Button
         marginTop={marginTop}
         backgroundColor={theme.colors.WHITE}
         textColor={label ? theme.colors.TEXT_SUPER_DARK : theme.colors.TEXT_SOFT}
-        buttonText={label || placeholder || 'Select'}
+        buttonText={
+          label ||
+          placeholder || <TranslatedText stringId="general.action.select" fallback="Select" />
+        }
         height={screenPercentageToDP(6.68, Orientation.Height)}
         justifyContent="flex-start"
         borderRadius={3}
@@ -82,11 +98,17 @@ export const AutocompleteModalField = ({
         borderColor={error ? theme.colors.ERROR : '#EBEBEB'}
         borderWidth={1}
         fontWeight={400}
-        fontSize={15}
+        fontSize={fontSize}
         padding={10}
         onPress={openModal}
         disabled={disabled}
-      />
+      >
+        {!label && (
+          <StyledView marginRight={5}>
+            <SearchIcon fill={theme.colors.TEXT_SOFT} />
+          </StyledView>
+        )}
+      </Button>
       {error && <TextFieldErrorMessage>{error}</TextFieldErrorMessage>}
     </StyledView>
   );

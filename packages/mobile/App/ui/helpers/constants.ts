@@ -10,7 +10,8 @@ export const DateFormats = {
   DAY_MONTH: 'dd MMM',
   DDMMYY: 'dd/MM/yyyy',
   SHORT_MONTH: 'MMM',
-  DATE_AND_TIME: 'dd MMM yyyy pp',
+  DATE_AND_TIME_HHMMSS: 'dd MMM yyyy pp',
+  DATE_AND_TIME_HHMM: 'dd MMM yyyy p',
   TIME_HHMMSS: 'pp',
   TIME: 'p',
 };
@@ -21,6 +22,12 @@ export const VisitTypes = {
   HOSPITAL: 'Hospital',
   CLINIC: 'Clinic',
   VISIT: 'Visit',
+};
+
+export const PatientFromRoute = {
+  HOME: 'home',
+  RECENTLY_VIEWED: 'recentlyViewed',
+  ALL_PATIENT: 'allPatient',
 };
 
 export const HeaderIcons = {
@@ -191,7 +198,8 @@ export const EncounterTypeNames = {
   emergency: 'Emergency',
   observation: 'Observation',
   triage: 'Triage',
-  surveyResponse: 'Survey response',
+  surveyResponse: 'Form response',
+  vaccination: 'Vaccination record',
 };
 
 export const LabRequestStatus = {
@@ -200,16 +208,6 @@ export const LabRequestStatus = {
   to_be_verified: 'To be verified',
   verified: 'Verified',
   published: 'published',
-};
-
-// also update /packages/lan/app/routes/apiv1/surveyResponse.js when this changes
-export const AutocompleteSourceToColumnMap = {
-  Department: 'name',
-  Facility: 'name',
-  Location: 'name',
-  LocationGroup: 'name',
-  ReferenceData: 'name',
-  User: 'displayName',
 };
 
 export const VitalsDataElements = {
@@ -246,4 +244,14 @@ export const NOTE_TYPES = {
 
 export const FORM_STATUSES = {
   SUBMIT_SCREEN_ATTEMPTED: 'SUBMIT_SCREEN_ATTEMPTED',
+};
+
+// also update /packages/lan/app/routes/apiv1/surveyResponse.js when this changes
+export const AutocompleteSourceToColumnMap = {
+  Department: 'name',
+  Facility: 'name',
+  Location: 'name',
+  LocationGroup: 'name',
+  ReferenceData: 'name',
+  User: 'displayName',
 };
