@@ -61,6 +61,11 @@ export class ReferenceData extends Model {
       as: 'imagingAreaExternalCode',
       foreignKey: 'areaId',
     });
+
+    this.hasOne(models.Facility, {
+      as: 'facility',
+      foreignKey: 'catchmentId',
+    });
   }
 
   static async create(values) {
@@ -89,7 +94,7 @@ export class ReferenceData extends Model {
     if (!parent?.id) {
       return ancestors;
     }
-    return ReferenceData.#getParentRecursive(parent.id, [...ancestors, parent], relationType);
+    return ReferenceData.#getParentRecursive(parent.id, [parent, ...ancestors], relationType);
   }
 
   static async getParent(id, relationType) {
@@ -119,14 +124,13 @@ export class ReferenceData extends Model {
 
   async getAncestors(relationType) {
     const { ReferenceData } = this.sequelize.models;
-    const baseNode = this.get({ plain: true });
     const parentNode = await ReferenceData.getParent(this.id, relationType);
 
     if (!parentNode) {
       return [];
     }
-    // Include the baseNode for convenience
-    return ReferenceData.#getParentRecursive(parentNode.id, [baseNode, parentNode], relationType);
+
+    return ReferenceData.#getParentRecursive(parentNode.id, [parentNode], relationType);
   }
 
   static buildSyncFilter() {

@@ -16,7 +16,9 @@ notes_info as (
       ) 
     ) aggregated_notes
   from notes
-  where note_type <> 'system' and record_type in ('LabRequest','ImagingRequest')
+  where note_type <> 'system' 
+    and record_type in ('LabRequest','ImagingRequest')
+    and deleted_at isnull
   group by record_id
 ),
 
@@ -48,6 +50,7 @@ lab_request_info as (
   on lti.lab_request_id  = lr.id
   left join notes_info ni on ni.record_id = lr.id
   where encounter_id = $encounter_id
+    and lr.deleted_at isnull
   group by encounter_id
 ),
 
@@ -68,6 +71,7 @@ procedure_info as (
   left join reference_data proc ON proc.id = procedure_type_id
   left join locations loc on loc.id = location_id
   where encounter_id = $encounter_id
+      and p.deleted_at isnull
   group by encounter_id
 ),
 
@@ -85,6 +89,7 @@ medications_info as (
   from encounter_medications em
   join reference_data medication on medication.id = em.medication_id
   where encounter_id = $encounter_id
+    and em.deleted_at isnull
   group by encounter_id
 ),
 
@@ -103,6 +108,7 @@ diagnosis_info as (
   join reference_data diagnosis on diagnosis.id = ed.diagnosis_id
   where certainty not in ('disproven', 'error')
   and encounter_id = $encounter_id
+  and ed.deleted_at isnull
   group by encounter_id
 ),
 
@@ -120,6 +126,7 @@ vaccine_info as (
   join scheduled_vaccines sv on sv.id = av.scheduled_vaccine_id 
   join reference_data drug on drug.id = sv.vaccine_id 
   where encounter_id = $encounter_id
+    and av.deleted_at isnull
   group by encounter_id
 ),
 
@@ -148,6 +155,7 @@ imaging_info as (
   left join notes_info ni on ni.record_id = ir.id::varchar
   left join imaging_areas_by_request iabr on iabr.imaging_request_id = ir.id
   where encounter_id = $encounter_id
+    and ir.deleted_at isnull
   group by encounter_id
 ),
 
@@ -179,6 +187,7 @@ latest_encounter_notes_info as (
   ) n
   where note_type != 'system'
   and record_id = $encounter_id
+  and n.deleted_at isnull
   group by n.record_id
 ),
 
@@ -198,6 +207,7 @@ department_info as (
     left join departments d on d.id = eh.department_id
     where change_type isnull or change_type = 'department'
     and e.id = $encounter_id
+    and e.deleted_at isnull
     group by eh.encounter_id
 ),
 
@@ -206,7 +216,9 @@ location_info as (
     distinct on(eh.encounter_id)
     eh.encounter_id,
     json_build_array(
-      json_build_object('location', coalesce(lg.name || ', ', '' ) || l.name, 
+      json_build_object('location', l.name, 
+                        'locationGroup', lg.name,
+                        'facility', f.name,
                         'assignedTime', ((case when eh.change_type is null 
                                             then e.start_date::timestamp at time zone $timezone_string 
                                             else eh.date::timestamp at time zone $timezone_string end)))) 
@@ -216,8 +228,10 @@ location_info as (
   and eh.deleted_at is null
   left join locations l on eh.location_id = l.id
   left join location_groups lg on l.location_group_id = lg.id
+  left join facilities f on l.facility_id = f.id
   where change_type isnull or change_type = 'location'
   and e.id = $encounter_id
+  and e.deleted_at isnull
   order by eh.encounter_id, eh.change_type nulls last, eh.date desc
 ),
 
@@ -236,6 +250,7 @@ triage_info as (
   lateral (select floor(total_minutes / 60) hours) hours,
   lateral (select floor(total_minutes - hours*60) remaining_minutes) remaining_minutes
   where encounter_id = $encounter_id
+  and t.deleted_at isnull
 ),
 
 discharge_disposition_info as (
@@ -255,6 +270,7 @@ discharge_disposition_info as (
         LIMIT 1)
   join reference_data disposition on disposition.id = d.disposition_id
   where encounter_id = $encounter_id
+  and e.deleted_at isnull
 ),
 
 
@@ -278,6 +294,7 @@ encounter_history_info as (
     ) "Encounter history"
   from encounter_history
   where encounter_id = $encounter_id
+  and deleted_at isnull
   group by encounter_id
 )
 

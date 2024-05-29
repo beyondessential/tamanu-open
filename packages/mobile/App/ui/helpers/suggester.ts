@@ -22,11 +22,16 @@ export class Suggester<ModelType extends BaseModelSubclass> {
 
   formatter: (entity: BaseModel) => OptionType;
 
-  constructor(model: ModelType, options, formatter = defaultFormatter) {
+  filter: (entity: BaseModel) => boolean;
+
+  constructor(model: ModelType, options, formatter = defaultFormatter, filter) {
     this.model = model;
     this.options = options;
     // If you don't provide a formatter, this assumes that your model has "name" and "id" fields
     this.formatter = formatter;
+    // Frontend filter applied to the data recieved. Use this to filter by permission
+    // by the model id: ({ id }) => ability.can('read', subject('noun', { id })),
+    this.filter = filter;
   }
 
   async fetch(options): Promise<BaseModel[]> {
@@ -45,7 +50,7 @@ export class Suggester<ModelType extends BaseModelSubclass> {
   };
 
   fetchSuggestions = async (search: string): Promise<OptionType[]> => {
-    const { where = {}, column = 'name' } = this.options;
+    const { where = {}, column = 'name', relations } = this.options;
 
     try {
       const data = await this.fetch({
@@ -56,9 +61,10 @@ export class Suggester<ModelType extends BaseModelSubclass> {
         order: {
           [column]: 'ASC',
         },
+        relations,
       });
 
-      return data.map(this.formatter);
+      return this.filter ? data.filter(this.filter).map(this.formatter) : data.map(this.formatter);
     } catch (e) {
       return [];
     }
