@@ -75,12 +75,7 @@ export const LabRequestsSearchBar = ({ status = '' }) => {
             <>
               <LocalisedField
                 name="laboratory"
-                label={
-                  <TranslatedText
-                    stringId="general.localisedField.laboratory.label"
-                    fallback="Laboratory"
-                  />
-                }
+                label={<TranslatedText stringId="lab.laboratory.label" fallback="Laboratory" />}
                 component={SuggesterSelectField}
                 endpoint="labTestLaboratory"
                 size="small"
@@ -107,7 +102,6 @@ export const LabRequestsSearchBar = ({ status = '' }) => {
     >
       <>
         <LocalisedField
-          keepLetterCase
           name="displayId"
           label={
             <TranslatedText
@@ -134,7 +128,7 @@ export const LabRequestsSearchBar = ({ status = '' }) => {
           }
           component={SearchField}
         />
-        <Field name="requestId" label="Test ID" component={SearchField} />
+        <Field name="requestId" label={<TranslatedText stringId="lab.requestId.label" fallback="Test ID" />} component={SearchField} />
         <Field
           name="category"
           label="Test category"
@@ -175,12 +169,7 @@ export const LabRequestsSearchBar = ({ status = '' }) => {
         {publishedStatus ? (
           <LocalisedField
             name="laboratory"
-            label={
-              <TranslatedText
-                stringId="general.localisedField.laboratory.label"
-                fallback="Laboratory"
-              />
-            }
+            label={<TranslatedText stringId="lab.laboratory.label" fallback="Laboratory" />}
             component={SuggesterSelectField}
             endpoint="labTestLaboratory"
             size="small"
